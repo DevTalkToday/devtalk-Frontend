@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { notFound } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { FetchGet } from "@/lib/api/fetch";
 
@@ -17,15 +18,19 @@ type PostDetail = {
   tags: string[];
 };
 
+const isNumericId = (v: string) => /^\d+$/.test(v);
+
 export default function PostDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const idStr = String(id ?? "");
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["post", id],
-    queryFn: () => FetchGet(`/api/posts/${id}`),
-    enabled: !!id,
+    queryKey: ["post", idStr],
+    queryFn: () => FetchGet(`/api/posts/${idStr}`),
+    enabled: !!idStr,
   });
 
+  if (!isNumericId(idStr)) notFound();
   if (isLoading) return <div className="p-6">Loading...</div>;
   if (error) return <div className="p-6">Error</div>;
 
