@@ -121,8 +121,12 @@ const request = async ({ method, path, data, auth, noStore }: RequestOptions) =>
 
 export const FetchGet = (path: string) => request({ method: "GET", path, auth: false, noStore: true });
 export const FetchPost = (path: string, data?: unknown) => request({ method: "POST", path, data, auth: false, noStore: true });
+export const FetchPut = (path: string, data?: unknown) => request({ method: "PUT", path, data, auth: false, noStore: true });
+export const FetchPatch = (path: string, data?: unknown) => request({ method: "PATCH", path, data, auth: false, noStore: true });
 export const FetchDelete = (path: string) => request({ method: "DELETE", path, auth: false, noStore: true });
 
 export const FetchGetAuth = (path: string) => request({ method: "GET", path, auth: true, noStore: true });
 export const FetchPostAuth = (path: string, data?: unknown) => request({ method: "POST", path, data, auth: true, noStore: true });
+export const FetchPutAuth = (path: string, data?: unknown) => request({ method: "PUT", path, data, auth: true, noStore: true });
+export const FetchPatchAuth = (path: string, data?: unknown) => request({ method: "PATCH", path, data, auth: true, noStore: true });
 export const FetchDeleteAuth = (path: string) => request({ method: "DELETE", path, auth: true, noStore: true });

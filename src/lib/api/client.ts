@@ -91,6 +91,14 @@ const parseResponse = async (res: Response) => {
   return await res.text();
 };
 
+const getPayloadMessage = (payload: unknown) => {
+  if (typeof payload === "string") return payload;
+  if (!payload || typeof payload !== "object") return null;
+
+  const candidate = payload as { message?: unknown };
+  return typeof candidate.message === "string" ? candidate.message : null;
+};
+
 export async function request<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
   const url = buildUrl(path, options.query);
@@ -115,10 +123,7 @@ export async function request<T = unknown>(path: string, options: RequestOptions
   const payload = await parseResponse(res);
 
   if (!res.ok) {
-    const message =
-      typeof payload === "string"
-        ? payload
-        : (payload as any)?.message ?? `Request failed (${res.status})`;
+    const message = getPayloadMessage(payload) ?? `Request failed (${res.status})`;
     throw new ApiError({ status: res.status, url, message, payload });
   }
 
