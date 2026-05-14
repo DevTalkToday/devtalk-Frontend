@@ -75,7 +75,7 @@ export default function SignupPage() {
             label="아이디"
             content="id"
             value={username}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => setUsername(e.target.value)}
           />
           <Input
             label="비밀번호"

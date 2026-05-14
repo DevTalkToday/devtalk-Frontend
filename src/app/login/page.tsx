@@ -15,7 +15,7 @@ export default function LoginPage() {
         label="아이디"
         content="id"
         value={username}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={(e) => setUsername(e.target.value)}
       />
 
       <Input

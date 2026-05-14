@@ -10,15 +10,24 @@ type Props = {
   value: string[];
   onChange: (next: string[]) => void;
   maxSelect?: number;
+  valueMode?: "code" | "label";
+};
+
+type ItemsResponse = { items: MajorOption[] };
+
+const hasItems = (data: unknown): data is ItemsResponse => {
+  if (!data || typeof data !== "object") return false;
+  const candidate = data as { items?: unknown };
+  return Array.isArray(candidate.items);
 };
 
 const normalizeMajors = (data: unknown): MajorOption[] => {
   if (Array.isArray(data)) return data as MajorOption[];
-  if (data && typeof data === "object" && Array.isArray((data as any).items)) return (data as any).items as MajorOption[];
+  if (hasItems(data)) return data.items;
   return [];
 };
 
-export default function MajorMultiSelect({ value, onChange, maxSelect }: Props) {
+export default function MajorMultiSelect({ value, onChange, maxSelect, valueMode = "code" }: Props) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["majors"],
     queryFn: () => FetchGet("/api/majors"),
@@ -27,38 +36,41 @@ export default function MajorMultiSelect({ value, onChange, maxSelect }: Props) 
 
   const options = useMemo(() => normalizeMajors(data), [data]);
 
-  const toggle = (code: string) => {
-    const has = value.includes(code);
+  const toggle = (option: MajorOption) => {
+    const selectedValue = valueMode === "label" ? option.label : option.code;
+    const has = value.includes(option.code) || value.includes(option.label);
+
     if (has) {
-      onChange(value.filter((v) => v !== code));
+      onChange(value.filter((item) => item !== option.code && item !== option.label));
       return;
     }
+
     if (maxSelect && value.length >= maxSelect) return;
-    onChange([...value, code]);
+    onChange([...value, selectedValue]);
   };
 
-  if (isLoading) return <div className="text-sm text-gray-500">전공 목록 불러오는 중...</div>;
-  if (isError) return <div className="text-sm text-red-600">전공 목록을 불러오지 못했습니다.</div>;
+  if (isLoading) return <div className="text-sm text-(--muted-strong)">전공 목록을 불러오는 중...</div>;
+  if (isError) return <div className="text-sm text-(--danger)">전공 목록을 불러오지 못했습니다.</div>;
 
   return (
     <div className="flex flex-wrap gap-2">
-      {options.map((opt) => {
-        const selected = value.includes(opt.code);
+      {options.map((option) => {
+        const selected = value.includes(option.code) || value.includes(option.label);
 
         return (
           <button
-            key={opt.code}
+            key={option.code}
             type="button"
             aria-pressed={selected}
-            onClick={() => toggle(opt.code)}
-            className="h-9 rounded-full border px-3 text-sm transition"
-            style={{
-                borderColor: selected ? "#3B82F6" : "#D1D5DB",
-                backgroundColor: selected ? "#EFF6FF" : "#FFFFFF",
-                color: selected ? "#1D4ED8" : "#374151",
-            }}
+            onClick={() => toggle(option)}
+            className={[
+              "inline-flex items-center justify-center gap-2 rounded-full border px-4 py-3 text-[0.88rem] font-medium transition duration-150",
+              selected
+                ? "border-(--accent) bg-(--surface-soft) text-(--foreground)"
+                : "border-(--border) bg-(--surface-raised) text-(--muted-strong) hover:-translate-y-px hover:border-(--accent) hover:bg-(--surface-soft) hover:text-(--foreground)",
+            ].join(" ")}
           >
-            {opt.label}
+            {option.label}
           </button>
         );
       })}
