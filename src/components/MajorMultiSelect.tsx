@@ -30,7 +30,7 @@ const normalizeMajors = (data: unknown): MajorOption[] => {
 export default function MajorMultiSelect({ value, onChange, maxSelect, valueMode = "code" }: Props) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["majors"],
-    queryFn: () => FetchGet("/api/majors"),
+    queryFn: () => FetchGet("/majors"),
     staleTime: 60_000,
   });
 

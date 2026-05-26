@@ -91,6 +91,25 @@ export function TrashIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function EllipsisIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function PlusIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
 export function SparkIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>

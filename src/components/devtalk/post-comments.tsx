@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { CommentActionsMenu, type MenuItem } from "@/components/devtalk/comment-actions-menu";
 import { Button, Field, Textarea } from "@/components/ui";
-import { FetchDelete, FetchPatch, FetchPost, FetchPut } from "@/lib/api/fetch";
+import { FetchDeleteAuth, FetchPatchAuth, FetchPostAuth, FetchPutAuth } from "@/lib/api/fetch";
+import { isLoggedIn } from "@/lib/auth/session";
 import { type PostCategory, type PostComment, type PostDetail } from "@/lib/posts/types";
 
 type CommentAction =
@@ -26,9 +28,9 @@ const getComposerCopy = (category: PostCategory) => {
   if (category === "bug") {
     return {
       title: "조사 로그 남기기",
-      description: "재현 로그, 원인 추정, 임시 우회 방법을 순서대로 남기고, 핵심 업데이트는 채택할 수 있습니다.",
-      placeholder: "재현 결과나 확인한 로그를 남겨보세요.",
-      submitLabel: "업데이트 등록",
+      description: "작성자에게 도움된 댓글은 채택될 수 있습니다.",
+      placeholder: "재현 로그, 원인 추정, 임시 우회 방법 등을 남겨보세요.",
+      submitLabel: "댓글 등록",
     };
   }
 
@@ -42,7 +44,7 @@ const getComposerCopy = (category: PostCategory) => {
 
 const getAcceptedBadgeLabel = (category: PostCategory) => {
   if (category === "qna") return "채택 답변";
-  if (category === "bug") return "채택 업데이트";
+  if (category === "bug") return "채택 댓글";
   return "채택 댓글";
 };
 
@@ -65,6 +67,7 @@ export function PostComments({
   post: PostDetail;
   onPostChange: (post: PostDetail) => void;
 }) {
+  const router = useRouter();
   const [draftComment, setDraftComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState("");
@@ -82,15 +85,15 @@ export function PostComments({
     mutationFn: async (action) => {
       switch (action.type) {
         case "create":
-          return (await FetchPost(`/api/posts/${post.id}/comments`, { body: action.body })) as PostDetail;
+          return (await FetchPostAuth(`/posts/${post.id}/comments`, { body: action.body })) as PostDetail;
         case "edit":
-          return (await FetchPut(`/api/posts/${post.id}/comments/${action.commentId}`, {
+          return (await FetchPutAuth(`/posts/${post.id}/comments/${action.commentId}`, {
             body: action.body,
           })) as PostDetail;
         case "delete":
-          return (await FetchDelete(`/api/posts/${post.id}/comments/${action.commentId}`)) as PostDetail;
+          return (await FetchDeleteAuth(`/posts/${post.id}/comments/${action.commentId}`)) as PostDetail;
         case "accept":
-          return (await FetchPatch(`/api/posts/${post.id}/comments/${action.commentId}`, {
+          return (await FetchPatchAuth(`/posts/${post.id}/comments/${action.commentId}`, {
             accepted: action.accepted,
           })) as PostDetail;
       }
@@ -119,6 +122,10 @@ export function PostComments({
   const submitComment = () => {
     const body = draftComment.trim();
     if (!body || commentMutation.isPending) return;
+    if (!isLoggedIn()) {
+      router.push("/login");
+      return;
+    }
     commentMutation.reset();
     commentMutation.mutate({ type: "create", body });
   };
@@ -138,12 +145,20 @@ export function PostComments({
   const saveCommentEdit = (commentId: string) => {
     const body = editingCommentBody.trim();
     if (!body || commentMutation.isPending) return;
+    if (!isLoggedIn()) {
+      router.push("/login");
+      return;
+    }
     commentMutation.reset();
     commentMutation.mutate({ type: "edit", commentId, body });
   };
 
   const removeComment = (commentId: string) => {
     if (commentMutation.isPending) return;
+    if (!isLoggedIn()) {
+      router.push("/login");
+      return;
+    }
     if (!window.confirm("이 댓글을 삭제할까요?")) return;
     commentMutation.reset();
     commentMutation.mutate({ type: "delete", commentId });
@@ -151,6 +166,10 @@ export function PostComments({
 
   const toggleCommentAccept = (comment: PostComment) => {
     if (commentMutation.isPending) return;
+    if (!isLoggedIn()) {
+      router.push("/login");
+      return;
+    }
     commentMutation.reset();
     commentMutation.mutate({ type: "accept", commentId: comment.id, accepted: !comment.isAccepted });
   };

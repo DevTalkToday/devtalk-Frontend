@@ -111,7 +111,7 @@ function PostsPageContent() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["posts", "posts-page", categoryKey || "all", resolutionKey || "all", match, query, sort, page],
-    queryFn: () => FetchGet(`/api/posts?${params.toString()}`) as Promise<PostsResponse>,
+    queryFn: () => FetchGet(`/posts?${params.toString()}`) as Promise<PostsResponse>,
   });
 
   const items = data?.items ?? [];

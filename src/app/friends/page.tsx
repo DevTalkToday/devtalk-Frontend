@@ -1,17 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { RequireLogin } from "@/components/auth/require-login";
 import { AppShell } from "@/components/devtalk/app-shell";
 import { Button } from "@/components/ui";
+import { FetchDeleteAuth, FetchGetAuth, FetchPatchAuth, FetchPostAuth } from "@/lib/api/fetch";
 
 type FriendTab = "friends" | "received" | "sent";
+type Relationship = "NONE" | "FRIEND" | "SENT" | "RECEIVED";
 
-type Person = {
-  id: string;
-  name: string;
-  description: string;
-  major: string;
-  accent: string;
+type FriendUser = {
+  id: number;
+  username: string;
+  nickname: string;
+  description: string | null;
+  majors: string[];
+};
+
+type Friendship = {
+  id: number;
+  status: "PENDING" | "ACCEPTED";
+  user: FriendUser;
+  createdAt: string;
+  respondedAt: string | null;
+};
+
+type FriendSummary = {
+  friends: Friendship[];
+  received: Friendship[];
+  sent: Friendship[];
+};
+
+type SearchResult = {
+  user: FriendUser;
+  relationship: Relationship;
+  friendshipId: number | null;
+};
+
+const emptySummary: FriendSummary = {
+  friends: [],
+  received: [],
+  sent: [],
 };
 
 const tabs: Array<{ id: FriendTab; label: string }> = [
@@ -19,70 +50,6 @@ const tabs: Array<{ id: FriendTab; label: string }> = [
   { id: "received", label: "받은 요청" },
   { id: "sent", label: "보낸 요청" },
 ];
-
-const friendItems: Person[] = [
-  {
-    id: "minjae",
-    name: "김민재",
-    description: "Next.js 배포와 캐시 이슈를 자주 정리합니다.",
-    major: "프론트엔드",
-    accent: "#2563ff",
-  },
-  {
-    id: "seoyeon",
-    name: "이서연",
-    description: "API 에러 로그와 재현 절차를 꼼꼼하게 공유합니다.",
-    major: "백엔드",
-    accent: "#14b8a6",
-  },
-  {
-    id: "hyunwoo",
-    name: "박현우",
-    description: "운영 환경 장애 대응 기록을 모아두고 있습니다.",
-    major: "DevOps",
-    accent: "#f97316",
-  },
-];
-
-const receivedItems: Person[] = [
-  {
-    id: "jiyun",
-    name: "최지윤",
-    description: "React Query 상태 관리와 폼 검증 경험을 공유합니다.",
-    major: "프론트엔드",
-    accent: "#7c3aed",
-  },
-  {
-    id: "taeho",
-    name: "정태호",
-    description: "데이터베이스 성능 문제와 해결 기록을 작성합니다.",
-    major: "데이터베이스",
-    accent: "#0891b2",
-  },
-];
-
-const sentItems: Person[] = [
-  {
-    id: "arin",
-    name: "한아린",
-    description: "테스트 자동화와 회귀 버그 분석에 관심이 많습니다.",
-    major: "QA 엔지니어링",
-    accent: "#db2777",
-  },
-  {
-    id: "joon",
-    name: "오준",
-    description: "인증 흐름과 보안 설정 관련 노트를 정리합니다.",
-    major: "보안",
-    accent: "#16a34a",
-  },
-];
-
-const itemsByTab: Record<FriendTab, Person[]> = {
-  friends: friendItems,
-  received: receivedItems,
-  sent: sentItems,
-};
 
 const titleByTab: Record<FriendTab, string> = {
   friends: "친구 목록",
@@ -96,32 +63,76 @@ const summaryByTab: Record<FriendTab, string> = {
   sent: "내가 친구 요청을 보낸 사람들입니다.",
 };
 
-function ProfileCard({ person, tab }: { person: Person; tab: FriendTab }) {
+const accentColors = ["#2563ff", "#14b8a6", "#f97316", "#7c3aed", "#0891b2", "#db2777", "#16a34a"];
+
+function getAccent(id: number) {
+  return accentColors[id % accentColors.length];
+}
+
+function getMajor(user: FriendUser) {
+  return user.majors.length > 0 ? user.majors.join(", ") : "전공 미입력";
+}
+
+function getDescription(user: FriendUser) {
+  return user.description?.trim() || `@${user.username}`;
+}
+
+function ProfileCard({
+  friendship,
+  tab,
+  busy,
+  onAccept,
+  onDelete,
+}: {
+  friendship: Friendship;
+  tab: FriendTab;
+  busy: boolean;
+  onAccept: (id: number) => void;
+  onDelete: (id: number) => void;
+}) {
+  const person = friendship.user;
+
   return (
     <article className="grid gap-4 rounded-[24px] border border-(--border) bg-(--surface-raised) p-5 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
       <div
         className="grid size-14 place-items-center rounded-full text-lg font-bold text-white"
-        style={{ backgroundColor: person.accent }}
+        style={{ backgroundColor: getAccent(person.id) }}
       >
-        {person.name.slice(0, 1)}
+        {person.nickname.slice(0, 1).toUpperCase()}
       </div>
 
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-lg font-semibold">{person.name}</h3>
+          <h3 className="text-lg font-semibold">{person.nickname}</h3>
           <span className="rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1 text-xs font-semibold text-(--muted-strong)">
-            {person.major}
+            {getMajor(person)}
           </span>
         </div>
-        <p className="mt-1 text-sm leading-6 text-(--muted-strong)">{person.description}</p>
+        <p className="mt-1 text-sm leading-6 text-(--muted-strong)">{getDescription(person)}</p>
       </div>
+
+      {tab === "friends" ? (
+        <div className="flex flex-wrap gap-2 md:justify-end">
+          <Link
+            href={`/messages?userId=${person.id}`}
+            title="채팅"
+            aria-label={`${person.nickname}님과 채팅`}
+            className="inline-flex size-11 items-center justify-center rounded-full border border-(--border) bg-(--surface-raised) transition duration-150 hover:-translate-y-px hover:border-(--accent) hover:bg-(--surface-soft)"
+          >
+            <Image src="/chat2.svg" alt="" width={18} height={18} className="theme-icon size-[18px]" />
+          </Link>
+          <Button type="button" size="sm" variant="danger" disabled={busy} onClick={() => onDelete(friendship.id)}>
+            친구 삭제
+          </Button>
+        </div>
+      ) : null}
 
       {tab === "received" ? (
         <div className="flex flex-wrap gap-2 md:justify-end">
-          <Button type="button" size="sm" variant="primary">
+          <Button type="button" size="sm" variant="primary" disabled={busy} onClick={() => onAccept(friendship.id)}>
             수락
           </Button>
-          <Button type="button" size="sm">
+          <Button type="button" size="sm" disabled={busy} onClick={() => onDelete(friendship.id)}>
             거절
           </Button>
         </div>
@@ -129,7 +140,7 @@ function ProfileCard({ person, tab }: { person: Person; tab: FriendTab }) {
 
       {tab === "sent" ? (
         <div className="flex flex-wrap gap-2 md:justify-end">
-          <Button type="button" size="sm">
+          <Button type="button" size="sm" disabled={busy} onClick={() => onDelete(friendship.id)}>
             요청 취소
           </Button>
         </div>
@@ -138,58 +149,236 @@ function ProfileCard({ person, tab }: { person: Person; tab: FriendTab }) {
   );
 }
 
-export default function FriendsPage() {
-  const [activeTab, setActiveTab] = useState<FriendTab>("friends");
-  const items = itemsByTab[activeTab];
+function SearchCard({
+  result,
+  busy,
+  onRequest,
+}: {
+  result: SearchResult;
+  busy: boolean;
+  onRequest: (userId: number) => void;
+}) {
+  const disabled = busy || result.relationship !== "NONE";
+  const labelByRelationship: Record<Relationship, string> = {
+    NONE: "친구 요청",
+    FRIEND: "이미 친구",
+    SENT: "요청 보냄",
+    RECEIVED: "받은 요청",
+  };
 
   return (
-    <AppShell showPageHeader={false}>
-      <section className="rounded-[28px] border border-(--border) bg-white/88 p-5 shadow-(--shadow) backdrop-blur-[18px] dark:bg-(--surface)">
-        <div className="grid gap-6 lg:grid-cols-[190px_minmax(0,1fr)] xl:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="rounded-[24px] border border-(--border) bg-white p-4 shadow-[0_18px_50px_rgba(51,94,180,0.08)] dark:bg-(--surface-raised)">
-            <h1 className="px-3 pb-4 text-3xl font-semibold">친구</h1>
-            <div className="grid gap-3">
-              {tabs.map((tab) => {
-                const selected = tab.id === activeTab;
+    <article className="grid gap-4 rounded-[20px] border border-(--border) bg-(--surface-raised) p-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
+      <div
+        className="grid size-12 place-items-center rounded-full text-base font-bold text-white"
+        style={{ backgroundColor: getAccent(result.user.id) }}
+      >
+        {result.user.nickname.slice(0, 1).toUpperCase()}
+      </div>
+      <div className="min-w-0">
+        <h3 className="font-semibold">{result.user.nickname}</h3>
+        <p className="mt-1 text-sm text-(--muted-strong)">{getDescription(result.user)}</p>
+      </div>
+      <Button type="button" size="sm" disabled={disabled} onClick={() => onRequest(result.user.id)}>
+        {labelByRelationship[result.relationship]}
+      </Button>
+    </article>
+  );
+}
 
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={[
-                      "h-[3.25rem] rounded-2xl border px-4 text-left text-sm font-semibold transition duration-150",
-                      selected
-                        ? "border-(--accent) bg-(--accent-soft) text-(--foreground)"
-                        : "border-(--border) bg-white text-(--muted-strong) hover:border-(--accent) hover:text-(--foreground) dark:bg-(--surface)",
-                    ].join(" ")}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-          </aside>
+export default function FriendsPage() {
+  const [activeTab, setActiveTab] = useState<FriendTab>("friends");
+  const [summary, setSummary] = useState<FriendSummary>(emptySummary);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
 
-          <div className="min-h-[520px] rounded-[24px] border border-(--border) bg-white p-5 shadow-[0_18px_50px_rgba(51,94,180,0.08)] dark:bg-(--surface)">
-            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="text-2xl font-semibold">{titleByTab[activeTab]}</h2>
-                <p className="mt-1 text-sm text-(--muted-strong)">{summaryByTab[activeTab]}</p>
+  const items = summary[activeTab];
+
+  const loadSummary = async () => {
+    const data = (await FetchGetAuth("/friends")) as FriendSummary;
+    setSummary(data);
+  };
+
+  useEffect(() => {
+    let alive = true;
+
+    const run = async () => {
+      setLoading(true);
+      try {
+        const data = (await FetchGetAuth("/friends")) as FriendSummary;
+        if (alive) setSummary(data);
+      } catch {
+        if (alive) setSummary(emptySummary);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const keyword = search.trim();
+    if (keyword.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    let alive = true;
+    const timeout = window.setTimeout(async () => {
+      setSearching(true);
+      try {
+        const data = (await FetchGetAuth(`/friends/search?q=${encodeURIComponent(keyword)}`)) as SearchResult[];
+        if (alive) setSearchResults(data);
+      } catch {
+        if (alive) setSearchResults([]);
+      } finally {
+        if (alive) setSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      alive = false;
+      window.clearTimeout(timeout);
+    };
+  }, [search]);
+
+  const counts = useMemo(
+    () => ({
+      friends: summary.friends.length,
+      received: summary.received.length,
+      sent: summary.sent.length,
+    }),
+    [summary],
+  );
+
+  const runAction = async (id: number, action: () => Promise<unknown>) => {
+    setBusyId(id);
+    try {
+      await action();
+      await loadSummary();
+      if (search.trim().length >= 2) {
+        const data = (await FetchGetAuth(`/friends/search?q=${encodeURIComponent(search.trim())}`)) as SearchResult[];
+        setSearchResults(data);
+      }
+    } catch {
+      await loadSummary().catch(() => setSummary(emptySummary));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleRequest = (userId: number) => {
+    runAction(userId, () => FetchPostAuth("/friends/requests", { userId }));
+  };
+
+  const handleAccept = (id: number) => {
+    runAction(id, () => FetchPatchAuth(`/friends/requests/${id}/accept`));
+  };
+
+  const handleDelete = (id: number) => {
+    runAction(id, () => FetchDeleteAuth(`/friends/${id}`));
+  };
+
+  return (
+    <RequireLogin>
+      <AppShell showPageHeader={false}>
+        <section className="rounded-[28px] border border-(--border) bg-white/88 p-5 shadow-(--shadow) backdrop-blur-[18px] dark:bg-(--surface)">
+          <div className="grid gap-6 lg:grid-cols-[190px_minmax(0,1fr)] xl:grid-cols-[220px_minmax(0,1fr)]">
+            <aside className="rounded-[24px] border border-(--border) bg-white p-4 shadow-[0_18px_50px_rgba(51,94,180,0.08)] dark:bg-(--surface-raised)">
+              <h1 className="px-3 pb-4 text-3xl font-semibold">친구</h1>
+              <div className="grid gap-3">
+                {tabs.map((tab) => {
+                  const selected = tab.id === activeTab;
+
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={[
+                        "flex h-[3.25rem] items-center justify-between rounded-2xl border px-4 text-left text-sm font-semibold transition duration-150",
+                        selected
+                          ? "border-(--accent) bg-(--accent-soft) text-(--foreground)"
+                          : "border-(--border) bg-white text-(--muted-strong) hover:border-(--accent) hover:text-(--foreground) dark:bg-(--surface)",
+                      ].join(" ")}
+                    >
+                      <span>{tab.label}</span>
+                      <span className="text-xs">{counts[tab.id]}</span>
+                    </button>
+                  );
+                })}
               </div>
-              <span className="rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1 text-xs font-semibold text-(--muted-strong)">
-                {items.length}명
-              </span>
-            </div>
+            </aside>
 
-            <div className="grid gap-3">
-              {items.map((person) => (
-                <ProfileCard key={person.id} person={person} tab={activeTab} />
-              ))}
+            <div className="min-h-[520px] rounded-[24px] border border-(--border) bg-white p-5 shadow-[0_18px_50px_rgba(51,94,180,0.08)] dark:bg-(--surface)">
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-2xl font-semibold">{titleByTab[activeTab]}</h2>
+                  <p className="mt-1 text-sm text-(--muted-strong)">{summaryByTab[activeTab]}</p>
+                </div>
+                <span className="rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1 text-xs font-semibold text-(--muted-strong)">
+                  {items.length}명
+                </span>
+              </div>
+
+              <div className="mb-5 grid gap-3 rounded-[20px] border border-(--border) bg-(--surface-soft) p-4">
+                <label className="text-sm font-semibold" htmlFor="friend-search">
+                  사용자 검색
+                </label>
+                <input
+                  id="friend-search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="닉네임, 아이디, 이메일로 검색"
+                  className="h-12 w-full rounded-full border border-(--border) bg-white px-4 text-sm text-(--foreground) outline-none transition focus:border-(--accent) dark:bg-(--surface-raised)"
+                />
+                {search.trim().length >= 2 ? (
+                  <div className="grid gap-2">
+                    {searching ? <p className="text-sm text-(--muted-strong)">검색 중입니다.</p> : null}
+                    {!searching && searchResults.length === 0 ? (
+                      <p className="text-sm text-(--muted-strong)">검색 결과가 없습니다.</p>
+                    ) : null}
+                    {searchResults.map((result) => (
+                      <SearchCard
+                        key={result.user.id}
+                        result={result}
+                        busy={busyId === result.user.id}
+                        onRequest={handleRequest}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid gap-3">
+                {loading ? <p className="text-sm text-(--muted-strong)">친구 목록을 불러오는 중입니다.</p> : null}
+                {!loading && items.length === 0 ? (
+                  <p className="rounded-[20px] border border-(--border) bg-(--surface-raised) p-5 text-sm text-(--muted-strong)">
+                    표시할 항목이 없습니다.
+                  </p>
+                ) : null}
+                {items.map((friendship) => (
+                  <ProfileCard
+                    key={friendship.id}
+                    friendship={friendship}
+                    tab={activeTab}
+                    busy={busyId === friendship.id}
+                    onAccept={handleAccept}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
-    </AppShell>
+        </section>
+      </AppShell>
+    </RequireLogin>
   );
 }

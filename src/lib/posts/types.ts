@@ -89,8 +89,8 @@ export type CommentAcceptPayload = {
 
 export const CATEGORY_LABELS: Record<PostCategory, string> = {
   qna: "해결 기록",
-  bug: "에러 리포트",
-  talk: "회고 노트",
+  bug: "도움 필요",
+  talk: "나만 볼 게시글",
 };
 
 export const SORT_LABELS: Record<PostSortOption, string> = {
@@ -108,8 +108,8 @@ export const RESOLUTION_FILTER_LABELS: Record<PostResolutionFilter, string> = {
 };
 
 export const BUG_STATUS_LABELS: Record<BugStatus, string> = {
-  open: "열림",
+  open: "미해결",
   investigating: "분석 중",
   fixed: "수정됨",
-  closed: "종료",
+  closed: "해결",
 };

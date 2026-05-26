@@ -66,14 +66,14 @@ function HomePageContent() {
   const query = searchParams.get("q") ?? "";
   const page = Math.max(Number(searchParams.get("page") ?? 1) || 1, 1);
 
-  const latestPath = `/api/posts?${new URLSearchParams({
+  const latestPath = `/posts?${new URLSearchParams({
     sort: "latest",
     page: String(page),
     limit: "6",
     ...(query ? { q: query } : {}),
   }).toString()}`;
 
-  const popularPath = `/api/posts?${new URLSearchParams({
+  const popularPath = `/posts?${new URLSearchParams({
     sort: "popular",
     page: "1",
     limit: "5",
@@ -184,7 +184,7 @@ function HomePageContent() {
           ) : null}
         </section>
 
-        <aside className="space-y-4 xl:sticky xl:top-24">
+        <aside className="space-y-4">
           <div className="rounded-[28px] border border-(--border) bg-(--surface) p-5 shadow-(--shadow) backdrop-blur-[18px]">
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">인기 게시글</h2>

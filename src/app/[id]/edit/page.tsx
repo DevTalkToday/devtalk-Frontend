@@ -15,7 +15,7 @@ export default function EditPostPage() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["post-edit", id],
-    queryFn: () => FetchGet(`/api/posts/${id}?track=false`),
+    queryFn: () => FetchGet(`/posts/${id}?track=false`),
     enabled: Boolean(id),
   });
 
