@@ -9,7 +9,7 @@ import { ArrowLeftIcon, CommentIcon, EyeIcon, HeartIcon, PenIcon, TrashIcon } fr
 import { MarkdownBody } from "@/components/devtalk/markdown-body";
 import { PostComments } from "@/components/devtalk/post-comments";
 import { Button, buttonClassName } from "@/components/ui";
-import { FetchDelete, FetchGet } from "@/lib/api/fetch";
+import { FetchDeleteAuth, FetchGet } from "@/lib/api/fetch";
 import { BUG_STATUS_LABELS, CATEGORY_LABELS, type PostDetail } from "@/lib/posts/types";
 
 const formatDateTime = (value: string) =>
@@ -51,7 +51,7 @@ export default function PostDetailPage() {
     queryKey: ["post", id],
     enabled: Boolean(id),
     queryFn: async () => {
-      const path = trackedViewRef.current ? `/api/posts/${id}?track=false` : `/api/posts/${id}`;
+      const path = trackedViewRef.current ? `/posts/${id}?track=false` : `/posts/${id}`;
       const response = (await FetchGet(path)) as PostDetail;
       trackedViewRef.current = true;
       return response;
@@ -77,32 +77,13 @@ export default function PostDetailPage() {
     setDeleting(true);
 
     try {
-      await FetchDelete(`/api/posts/${id}`);
+      await FetchDeleteAuth(`/posts/${id}`);
       void queryClient.invalidateQueries({ queryKey: ["posts"] });
       startTransition(() => router.push("/"));
     } finally {
       setDeleting(false);
     }
   };
-
-  const sidebar = post ? (
-    <div className="space-y-3 pt-2">
-      <div className="grid gap-1 rounded-3xl border border-(--border) bg-(--surface-raised) p-4">
-        <span className="text-[0.72rem] font-bold uppercase tracking-[0.24em] text-(--muted)">Category</span>
-        <strong className="text-2xl tracking-[-0.05em]">{CATEGORY_LABELS[post.category]}</strong>
-        <span className="text-sm text-(--muted-strong)">{getHeadlineStatus(post)}</span>
-      </div>
-      <div className="grid gap-1 rounded-3xl border border-(--border) bg-(--surface-raised) p-4">
-        <span className="text-[0.72rem] font-bold uppercase tracking-[0.24em] text-(--muted)">Updated</span>
-        <strong className="text-lg tracking-[-0.04em]">{formatDateTime(post.updatedAt)}</strong>
-        <span className="text-sm text-(--muted-strong)">마지막으로 반영된 시각</span>
-      </div>
-      <div className="grid gap-1 rounded-3xl border border-(--border) bg-(--surface-raised) p-4">
-        <span className="text-[0.72rem] font-bold uppercase tracking-[0.24em] text-(--muted)">Comments</span>
-        <strong className="text-2xl tracking-[-0.05em]">{post.comments.length}</strong>
-      </div>
-    </div>
-  ) : null;
 
   return (
     <AppShell
@@ -132,7 +113,6 @@ export default function PostDetailPage() {
           ) : null}
         </>
       }
-      sidebar={sidebar}
     >
       {isLoading ? (
         <section className="rounded-4xl border border-(--border) bg-(--surface) p-6 text-sm text-(--muted-strong) shadow-(--shadow) backdrop-blur-[18px]">기록을 불러오는 중입니다...</section>

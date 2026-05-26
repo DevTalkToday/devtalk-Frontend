@@ -1,66 +1,51 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 import MajorMultiSelect from "@/components/MajorMultiSelect";
-import { Button, Input } from "@/components/ui";
-import { FetchPost } from "@/lib/api/fetch";
+import { Button, Input, Textarea } from "@/components/ui";
+import { FetchPostAuth } from "@/lib/api/fetch";
 import { saveAuthSession } from "@/lib/auth/session";
 
-type AuthResponse = {
-  accessToken: string;
-  user: {
-    id: number;
-    username: string;
-    nickname: string;
-    email: string | null;
-    profileCompleted: boolean;
-  };
+type UserResponse = {
+  id: number;
+  username: string;
+  nickname: string;
+  email: string | null;
+  description: string | null;
+  profileCompleted: boolean;
 };
 
-type Consents = {
-  terms: boolean;
-  privacy: boolean;
-};
-
-export default function SignupPage() {
+export default function CompleteProfilePage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
   const [nickname, setNickname] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [description, setDescription] = useState("");
   const [majors, setMajors] = useState<string[]>([]);
-  const [consents, setConsents] = useState<Consents>({
+  const [consents, setConsents] = useState({
     terms: false,
     privacy: false,
   });
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const passwordMatches = password.length > 0 && password === passwordConfirm;
-  const requiredConsentsChecked = consents.terms && consents.privacy;
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
   const canSubmit = useMemo(() => {
     return (
-      emailOk &&
+      nickname.trim().length > 0 &&
       password.length >= 8 &&
-      passwordMatches &&
+      password === passwordConfirm &&
       majors.length > 0 &&
-      requiredConsentsChecked
+      consents.terms &&
+      consents.privacy
     );
-  }, [emailOk, password.length, passwordMatches, majors.length, requiredConsentsChecked]);
-
-  const updateConsent = (name: keyof Consents, checked: boolean) => {
-    setConsents((current) => ({ ...current, [name]: checked }));
-  };
+  }, [nickname, password, passwordConfirm, majors.length, consents.terms, consents.privacy]);
 
   const toggleAllConsents = (checked: boolean) => {
     setConsents({ terms: checked, privacy: checked });
   };
 
-  const submitSignup = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage("");
 
@@ -68,57 +53,44 @@ export default function SignupPage() {
 
     try {
       setIsSubmitting(true);
-      const normalizedEmail = email.trim();
-      const auth = (await FetchPost("/auth/signup", {
-        username: normalizedEmail,
+      const user = (await FetchPostAuth("/auth/profile", {
+        nickname: nickname.trim(),
         password,
-        nickname: nickname.trim() || normalizedEmail,
+        passwordConfirm,
+        description: description.trim() || null,
         majors,
-      })) as AuthResponse;
+      })) as UserResponse;
 
-      saveAuthSession(auth.accessToken, auth.user);
+      const accessToken = localStorage.getItem("accessToken");
+      if (accessToken) saveAuthSession(accessToken, user);
       router.replace("/");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "회원가입에 실패했습니다.");
+      setMessage(error instanceof Error ? error.message : "프로필 저장에 실패했습니다.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const allConsentsChecked = consents.terms && consents.privacy;
-
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-5 py-10">
+    <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-6 py-10">
       <form
-        onSubmit={submitSignup}
+        onSubmit={handleSubmit}
         className="w-full rounded-[28px] border border-(--border) bg-(--surface) p-6 shadow-(--shadow)"
       >
-        <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-(--foreground)">회원가입</h1>
-            <p className="mt-2 text-sm text-(--muted-strong)">Devtalk 계정을 만듭니다.</p>
-          </div>
-          <Link className="text-sm font-semibold text-(--accent)" href="/login">
-            로그인
-          </Link>
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold">계정 정보 입력</h1>
+          <p className="mt-2 text-sm leading-6 text-(--muted-strong)">
+            소셜 로그인 후 Devtalk에서 사용할 정보를 입력해 주세요.
+          </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
-            label="이메일"
-            content="name@example.com"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            autoComplete="email"
-            required
-          />
-          <Input
             label="닉네임"
-            content="비우면 이메일로 설정"
+            content="표시될 닉네임"
             value={nickname}
             onChange={(event) => setNickname(event.target.value)}
-            autoComplete="nickname"
+            required
           />
           <Input
             label="비밀번호"
@@ -126,21 +98,30 @@ export default function SignupPage() {
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            autoComplete="new-password"
             required
           />
           <Input
             label="비밀번호 확인"
-            content="비밀번호 재입력"
+            content="비밀번호를 다시 입력"
             type="password"
             value={passwordConfirm}
             onChange={(event) => setPasswordConfirm(event.target.value)}
-            autoComplete="new-password"
             required
           />
         </div>
 
-        {passwordConfirm && !passwordMatches ? (
+        <div className="mt-4">
+          <Textarea
+            label="설명"
+            content="간단한 자기소개를 입력해 주세요"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            rows={4}
+            maxLength={500}
+          />
+        </div>
+
+        {passwordConfirm && password !== passwordConfirm ? (
           <p className="mt-3 text-sm text-(--danger)">비밀번호 확인이 일치하지 않습니다.</p>
         ) : null}
 
@@ -156,7 +137,7 @@ export default function SignupPage() {
           <label className="flex items-center gap-3 text-sm font-semibold text-(--foreground)">
             <input
               type="checkbox"
-              checked={allConsentsChecked}
+              checked={consents.terms && consents.privacy}
               onChange={(event) => toggleAllConsents(event.target.checked)}
               className="size-4 accent-(--accent)"
             />
@@ -167,7 +148,7 @@ export default function SignupPage() {
               <input
                 type="checkbox"
                 checked={consents.terms}
-                onChange={(event) => updateConsent("terms", event.target.checked)}
+                onChange={(event) => setConsents((current) => ({ ...current, terms: event.target.checked }))}
                 className="size-4 accent-(--accent)"
               />
               이용약관 동의
@@ -176,7 +157,7 @@ export default function SignupPage() {
               <input
                 type="checkbox"
                 checked={consents.privacy}
-                onChange={(event) => updateConsent("privacy", event.target.checked)}
+                onChange={(event) => setConsents((current) => ({ ...current, privacy: event.target.checked }))}
                 className="size-4 accent-(--accent)"
               />
               개인정보 처리방침 동의
@@ -187,7 +168,7 @@ export default function SignupPage() {
         {message ? <p className="mt-4 text-sm text-(--danger)">{message}</p> : null}
 
         <Button type="submit" variant="primary" fullWidth disabled={!canSubmit || isSubmitting} className="mt-6">
-          {isSubmitting ? "가입 중" : "가입하기"}
+          {isSubmitting ? "저장 중" : "완료"}
         </Button>
       </form>
     </main>

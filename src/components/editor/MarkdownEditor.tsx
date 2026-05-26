@@ -102,12 +102,7 @@ export default function MarkdownEditor({ value, onChange }: Props) {
             onPaste={onPaste}
             onDragOver={(event) => event.preventDefault()}
             onDrop={onDrop}
-            placeholder={`# 제목
-
-문제 상황, 코드, 재현 단계, 기대 결과를 자유롭게 적어주세요.
-
-- 이미지 붙여넣기 / 드래그 지원
-- 코드 블록, 목록, 링크 지원`}
+            placeholder={`본문에 들어갈 내용을 작성해주세요`}
           />
         )}
 

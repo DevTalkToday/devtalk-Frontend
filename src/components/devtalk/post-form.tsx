@@ -6,10 +6,9 @@ import MajorMultiSelect from "@/components/MajorMultiSelect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import { Button, ChipGroup, Field, Input, Textarea } from "@/components/ui";
 import { normalizeMajorValues } from "@/lib/mock/majors";
-import { FetchPost, FetchPut } from "@/lib/api/fetch";
+import { FetchPostAuth, FetchPutAuth } from "@/lib/api/fetch";
 import {
   BUG_PRIORITIES,
-  BUG_STATUSES,
   BUG_STATUS_LABELS,
   CATEGORY_LABELS,
   type BugPriority,
@@ -56,6 +55,8 @@ const fromLines = (value: string) =>
     .split(/\r?\n/)
     .map((item) => item.trim())
     .filter(Boolean);
+
+const BUG_STATUS_FORM_OPTIONS: BugStatus[] = ["open", "fixed", "closed"];
 
 const createInitialState = (post?: PostDetail): FormState => ({
   title: post?.title ?? "",
@@ -126,8 +127,8 @@ export function PostForm({ mode, postId, initialPost }: Props) {
 
       const response =
         mode === "create"
-          ? await FetchPost("/api/posts", payload)
-          : await FetchPut(`/api/posts/${postId}`, payload);
+          ? await FetchPostAuth("/posts", payload)
+          : await FetchPutAuth(`/posts/${postId}`, payload);
 
       const id = (response as PostDetail).id;
       startTransition(() => router.push(`/${id}`));
@@ -146,7 +147,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
             <Input
               id="post-title"
               label="제목"
-              content="에러 메시지나 해결한 문제를 한 줄로 정리하세요"
+              content="제목에 들어갈 내용을 작성해주세요"
               value={form.title}
               onChange={(event) => patch("title", event.target.value)}
             />
@@ -221,7 +222,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
       {form.category === "bug" ? (
         <section className="space-y-5 rounded-4xl border border-(--border) bg-(--surface) p-6 shadow-(--shadow) backdrop-blur-[18px]">
           <Field
-            label="에러 리포트"
+            label="도움 필요"
             description="상태, 우선순위, 환경, 재현 절차를 이슈처럼 관리합니다."
           >
             {null}
@@ -232,7 +233,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
               label="상태"
               value={form.bugStatus}
               onChange={(status) => patch("bugStatus", status)}
-              options={BUG_STATUSES.map((status) => ({
+              options={BUG_STATUS_FORM_OPTIONS.map((status) => ({
                 value: status,
                 label: BUG_STATUS_LABELS[status],
               }))}
@@ -251,7 +252,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
             <Input
               id="bug-assignee"
               label="담당자"
-              content="@frontend-owner 또는 @platform"
+              content="ex) @frontend-owner 또는 @platform"
               value={form.bugAssignee}
               onChange={(event) => patch("bugAssignee", event.target.value)}
             />
@@ -261,14 +262,14 @@ export function PostForm({ mode, postId, initialPost }: Props) {
             <Input
               id="bug-env"
               label="환경"
-              content="브라우저, OS, 패키지 버전"
+              content="ex) 브라우저, OS, 패키지 버전"
               value={form.bugEnvironment}
               onChange={(event) => patch("bugEnvironment", event.target.value)}
             />
             <Input
               id="bug-labels"
               label="라벨"
-              content="editor, performance, auth"
+              content="ex) editor, performance, auth"
               value={form.bugLabelsText}
               onChange={(event) => patch("bugLabelsText", event.target.value)}
             />
@@ -278,7 +279,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
             <Textarea
               id="bug-expected"
               label="기대 결과"
-              content="정상 동작 시 기대하는 결과"
+              content="정상 동작 시 기대하는 결과를 작성해주세요"
               className="min-h-[148px]"
               value={form.bugExpected}
               onChange={(event) => patch("bugExpected", event.target.value)}
@@ -286,7 +287,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
             <Textarea
               id="bug-actual"
               label="실제 결과"
-              content="현재 관찰되는 실제 결과"
+              content="현재 관찰되는 실제 결과를 작성해주세요"
               className="min-h-[148px]"
               value={form.bugActual}
               onChange={(event) => patch("bugActual", event.target.value)}
@@ -296,7 +297,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
           <Textarea
             id="bug-steps"
             label="재현 절차"
-            content={`1. 페이지 접속\n2. 버튼 클릭\n3. 콘솔 에러 확인`}
+            content={`1. 페이지 접속\n2. 버튼 클릭\n3. 에러 발생`}
             className="min-h-[148px]"
             value={form.bugSteps}
             onChange={(event) => patch("bugSteps", event.target.value)}

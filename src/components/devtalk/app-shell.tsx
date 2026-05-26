@@ -4,9 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { buttonClassName } from "@/components/ui";
+import { FetchGetAuth, FetchPostAuth } from "@/lib/api/fetch";
+import { clearAuthSession, getAuthUser, issueFreshGuestToken, useAuthStatus } from "@/lib/auth/session";
 
 type AppShellProps = {
   title?: string;
@@ -16,6 +18,16 @@ type AppShellProps = {
   showPageHeader?: boolean;
   compactRadius?: boolean;
   children: ReactNode;
+};
+
+type ShellAuthUser = {
+  username?: string | null;
+  nickname?: string | null;
+  avatarUrl?: string | null;
+};
+
+type ProfileMeResponse = {
+  user: ShellAuthUser | null;
 };
 
 const primaryNavItems = [
@@ -31,6 +43,11 @@ const isActivePath = (pathname: string, href: string) => {
   return pathname === href || pathname.startsWith(`${href}/`);
 };
 
+const asShellAuthUser = (value: unknown): ShellAuthUser | null => {
+  if (!value || typeof value !== "object") return null;
+  return value as ShellAuthUser;
+};
+
 export function AppShell({
   title,
   description,
@@ -43,6 +60,42 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [shellUser, setShellUser] = useState<ShellAuthUser | null>(null);
+  const { ready: authReady, loggedIn } = useAuthStatus();
+  const authUser = shellUser ?? (authReady && loggedIn ? asShellAuthUser(getAuthUser()) : null);
+  const profileName = authUser?.nickname?.trim() || authUser?.username?.trim() || "U";
+  const profileAvatarUrl = authUser?.avatarUrl?.trim() || "";
+  const profileInitial = profileName.slice(0, 1).toUpperCase() || "U";
+
+  useEffect(() => {
+    let alive = true;
+
+    const syncProfile = async () => {
+      if (!authReady || !loggedIn) {
+        setShellUser(null);
+        return;
+      }
+
+      setShellUser(asShellAuthUser(getAuthUser()));
+
+      try {
+        const profile = (await FetchGetAuth("/profile/me")) as ProfileMeResponse;
+        if (alive) setShellUser(asShellAuthUser(profile.user));
+      } catch {
+        if (alive) setShellUser(asShellAuthUser(getAuthUser()));
+      }
+    };
+
+    syncProfile();
+    window.addEventListener("storage", syncProfile);
+    window.addEventListener("devtalk-auth-changed", syncProfile);
+
+    return () => {
+      alive = false;
+      window.removeEventListener("storage", syncProfile);
+      window.removeEventListener("devtalk-auth-changed", syncProfile);
+    };
+  }, [authReady, loggedIn]);
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -56,15 +109,34 @@ export function AppShell({
     router.push(params.toString() ? `/?${params.toString()}` : "/");
   };
 
+  const handleAuthButton = async () => {
+    if (!loggedIn) {
+      router.push("/login");
+      return;
+    }
+
+    try {
+      await FetchPostAuth("/auth/logout");
+    } catch {
+      // The local session should still be cleared even if the server token is already gone.
+    } finally {
+      clearAuthSession();
+      await issueFreshGuestToken().catch(() => undefined);
+      router.push("/");
+    }
+  };
+
   return (
-    <div className={["min-h-screen px-4 py-4 md:px-6 lg:px-8", compactRadius ? "compact-radius" : ""].join(" ")}>
+    <div className={["min-h-screen overflow-x-clip px-4 py-4 md:px-6 lg:px-8", compactRadius ? "compact-radius" : ""].join(" ")}>
       <div className="mx-auto grid max-w-[1500px] gap-6">
-        <header
-          className={[
-            "sticky top-4 z-20 border border-(--border) bg-(--surface) px-4 py-3 shadow-(--shadow) backdrop-blur-[18px]",
-            compactRadius ? "rounded-[14px]" : "rounded-[28px]",
-          ].join(" ")}
-        >
+        <div className="sticky top-4 z-20">
+          <div className="pointer-events-none absolute bottom-[-1rem] left-1/2 top-[-1rem] z-0 w-screen -translate-x-1/2 bg-transparent backdrop-blur-[14px] backdrop-saturate-150" />
+          <header
+            className={[
+              "relative z-10 border border-(--border) bg-(--surface) px-4 py-3 shadow-(--shadow) backdrop-blur-[18px]",
+              compactRadius ? "rounded-[14px]" : "rounded-[28px]",
+            ].join(" ")}
+          >
           <div className="grid gap-3 xl:grid-cols-[auto_minmax(260px,1fr)_auto] xl:items-center">
             <nav aria-label="주요 메뉴" className="flex flex-wrap items-center gap-2">
               {primaryNavItems.map((item) => {
@@ -98,9 +170,14 @@ export function AppShell({
                   isActivePath(pathname, "/profile") ? "border-(--accent) bg-(--accent-soft)" : "",
                 ].join(" ")}
               >
-                <span className="grid size-7 place-items-center rounded-full bg-(--accent) text-xs text-(--primary-foreground)">
-                  U
-                </span>
+                {profileAvatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={profileAvatarUrl} alt="" className="size-7 rounded-full object-cover" />
+                ) : (
+                  <span className="grid size-7 place-items-center rounded-full bg-(--accent) text-xs text-(--primary-foreground)">
+                    {profileInitial}
+                  </span>
+                )}
               </Link>
             </nav>
 
@@ -131,12 +208,13 @@ export function AppShell({
               >
                 <Image src="/config.svg" alt="" width={16} height={16} className="theme-icon size-4" />
               </Link>
-              <button type="button" className={buttonClassName({ size: "sm" })}>
-                로그아웃
+              <button type="button" onClick={handleAuthButton} className={buttonClassName({ size: "sm" })}>
+                {authReady ? (loggedIn ? "로그아웃" : "로그인") : "로그인"}
               </button>
             </div>
           </div>
-        </header>
+          </header>
+        </div>
 
         <main className="space-y-6">
           {showPageHeader && title ? (

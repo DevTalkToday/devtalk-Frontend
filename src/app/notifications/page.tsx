@@ -1,149 +1,269 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { RequireLogin } from "@/components/auth/require-login";
 import { AppShell } from "@/components/devtalk/app-shell";
+import { Button } from "@/components/ui";
+import { FetchGetAuth, FetchPatchAuth } from "@/lib/api/fetch";
 
-type NotificationKind = "comment" | "like" | "accepted" | "mention";
+type NotificationKind =
+  | "POST_COMMENT"
+  | "ADMIN_NOTICE"
+  | "REPORT_SUBMITTED"
+  | "REPORT_REVIEWED"
+  | "COMMENT_ACCEPTED";
 
 type NotificationItem = {
-  id: string;
-  kind: NotificationKind;
+  id: number;
+  type: NotificationKind;
   title: string;
   preview: string;
   body: string;
-  actor: string;
-  target: string;
-  time: string;
+  actorName: string;
+  targetType: string | null;
+  targetId: string | null;
+  targetUrl: string | null;
+  createdAt: string;
+  readAt: string | null;
   unread: boolean;
 };
 
 const kindLabel: Record<NotificationKind, string> = {
-  comment: "댓글",
-  like: "공감",
-  accepted: "해결 채택",
-  mention: "멘션",
+  POST_COMMENT: "댓글",
+  ADMIN_NOTICE: "공지",
+  REPORT_SUBMITTED: "신고 접수",
+  REPORT_REVIEWED: "신고 확인",
+  COMMENT_ACCEPTED: "댓글 채택",
 };
 
-const notifications: NotificationItem[] = [
-  {
-    id: "n1",
-    kind: "comment",
-    title: "새 댓글이 달렸습니다",
-    preview: "김민재님이 라우트 캐시 기록에 댓글을 남겼습니다.",
-    body: "김민재님이 `Next.js 배포 후 라우트 캐시가 갱신되지 않은 기록`에 재현 조건을 추가로 남겼습니다. 캐시 무효화 범위와 배포 직후 요청 타이밍을 함께 확인해 달라는 내용입니다.",
-    actor: "김민재",
-    target: "Next.js 배포 후 라우트 캐시가 갱신되지 않은 기록",
-    time: "5분 전",
-    unread: true,
-  },
-  {
-    id: "n2",
-    kind: "like",
-    title: "공감이 추가되었습니다",
-    preview: "이서연님 외 2명이 메모리 증가 에러 기록에 공감했습니다.",
-    body: "이서연님, 박현우님, 최지윤님이 `Markdown 이미지 미리보기에서 메모리가 계속 증가한 에러` 기록에 공감했습니다. 비슷한 blob URL 해제 문제를 겪은 팀원이 있어 참고용으로 저장했습니다.",
-    actor: "이서연",
-    target: "Markdown 이미지 미리보기에서 메모리가 계속 증가한 에러",
-    time: "32분 전",
-    unread: true,
-  },
-  {
-    id: "n3",
-    kind: "accepted",
-    title: "해결 댓글이 채택되었습니다",
-    preview: "작성한 답변이 인증 에러 회고의 해결 댓글로 채택되었습니다.",
-    body: "`같은 인증 에러가 반복되지 않도록 남긴 팀 회고`에서 작성한 답변이 해결 댓글로 채택되었습니다. 토큰 만료 처리 누락을 방지하는 체크리스트가 본문에 연결되었습니다.",
-    actor: "하린",
-    target: "같은 인증 에러가 반복되지 않도록 남긴 팀 회고",
-    time: "어제",
-    unread: false,
-  },
-  {
-    id: "n4",
-    kind: "mention",
-    title: "댓글에서 멘션되었습니다",
-    preview: "오준님이 API 응답 지연 기록에서 당신을 언급했습니다.",
-    body: "오준님이 API 응답 지연 기록의 댓글에서 프론트엔드 재시도 정책 확인을 요청했습니다. 네트워크 탭 캡처와 서버 로그 시간을 맞춰보자는 내용입니다.",
-    actor: "오준",
-    target: "API 응답 지연 기록",
-    time: "월요일",
-    unread: false,
-  },
-];
+function formatNotificationTime(value: string) {
+  const target = new Date(value);
+  const now = new Date();
+  const diffMs = Math.max(now.getTime() - target.getTime(), 0);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (diffMs < minute) return "방금";
+  if (diffMs < hour) return `${Math.floor(diffMs / minute)}분 전`;
+  if (diffMs < day) return `${Math.floor(diffMs / hour)}시간 전`;
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(target);
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "알림을 불러오지 못했습니다.";
+}
 
 export default function NotificationsPage() {
-  const [selectedId, setSelectedId] = useState(notifications[0].id);
-  const selected = notifications.find((item) => item.id === selectedId) ?? notifications[0];
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const selected = useMemo(
+    () => notifications.find((item) => item.id === selectedId) ?? notifications[0] ?? null,
+    [notifications, selectedId],
+  );
+  const unreadCount = notifications.filter((item) => item.unread).length;
+  const hasNotifications = notifications.length > 0;
+
+  const loadNotifications = async () => {
+    const data = (await FetchGetAuth("/notifications?limit=100")) as NotificationItem[];
+    setNotifications(data);
+    setSelectedId((current) => (current && data.some((item) => item.id === current) ? current : data[0]?.id ?? null));
+    return data;
+  };
+
+  useEffect(() => {
+    let alive = true;
+
+    const run = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const data = (await FetchGetAuth("/notifications?limit=100")) as NotificationItem[];
+        if (!alive) return;
+        setNotifications(data);
+        setSelectedId(data[0]?.id ?? null);
+      } catch (caught) {
+        if (alive) {
+          setNotifications([]);
+          setSelectedId(null);
+          setError(getErrorMessage(caught));
+        }
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const selectNotification = async (item: NotificationItem) => {
+    setSelectedId(item.id);
+    if (!item.unread) return;
+
+    setNotifications((current) =>
+      current.map((candidate) =>
+        candidate.id === item.id ? { ...candidate, unread: false, readAt: new Date().toISOString() } : candidate,
+      ),
+    );
+
+    try {
+      const updated = (await FetchPatchAuth(`/notifications/${item.id}/read`)) as NotificationItem;
+      setNotifications((current) => current.map((candidate) => (candidate.id === updated.id ? updated : candidate)));
+    } catch {
+      await loadNotifications().catch(() => undefined);
+    }
+  };
+
+  const markAllRead = async () => {
+    setNotifications((current) =>
+      current.map((item) => ({ ...item, unread: false, readAt: item.readAt ?? new Date().toISOString() })),
+    );
+    await FetchPatchAuth("/notifications/read-all").catch(() => loadNotifications().catch(() => undefined));
+  };
 
   return (
-    <AppShell showPageHeader={false}>
-      <section className="grid h-[calc(100vh-8.5rem)] min-h-0 gap-5 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] border border-(--border) bg-(--surface) p-4 shadow-(--shadow)">
-          <h1 className="px-2 pb-4 text-3xl font-semibold">알림</h1>
-          <div className="themed-scrollbar grid min-h-0 gap-3 overflow-y-auto pr-1">
-            {notifications.map((item) => {
-              const selectedItem = item.id === selected.id;
+    <RequireLogin>
+      <AppShell showPageHeader={false}>
+        <section className="rounded-[28px] border border-(--border) bg-white/88 p-5 shadow-(--shadow) backdrop-blur-[18px] dark:bg-(--surface)">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-semibold">알림</h1>
+              <span className="rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1 text-xs font-semibold text-(--muted-strong)">
+                {unreadCount}개 미읽음
+              </span>
+            </div>
 
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedId(item.id)}
-                  className={[
-                    "grid min-h-[104px] min-w-0 gap-2 overflow-hidden border p-4 text-left transition duration-150",
-                    selectedItem
-                      ? "border-(--accent) bg-(--accent-soft)"
-                      : "border-(--border) bg-(--surface-raised) hover:border-(--accent)",
-                  ].join(" ")}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="border border-(--border) bg-(--surface-soft) px-2 py-0.5 text-xs font-semibold text-(--muted-strong)">
-                      {kindLabel[item.kind]}
-                    </span>
-                    {item.unread ? <span className="size-2 rounded-full bg-(--accent)" /> : null}
+            <Button type="button" size="sm" disabled={loading || unreadCount === 0} onClick={markAllRead}>
+              모두 읽음
+            </Button>
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+            <aside className="min-h-[420px] border border-(--border) bg-white p-4 shadow-[0_18px_50px_rgba(51,94,180,0.08)] dark:bg-(--surface-raised)">
+              <div className="mb-4 flex items-center justify-between gap-3 px-1">
+                <h2 className="text-lg font-semibold">받은 알림</h2>
+                <span className="text-xs font-semibold text-(--muted-strong)">{notifications.length}개</span>
+              </div>
+
+              <div className="themed-scrollbar grid max-h-[560px] min-h-[320px] auto-rows-max content-start gap-3 overflow-y-auto pr-1">
+                {loading ? (
+                  <div className="border border-(--border) bg-(--surface-raised) p-5 text-sm text-(--muted-strong)">
+                    알림을 불러오는 중입니다.
                   </div>
-                  <strong className="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-base">
-                    {item.title}
-                  </strong>
-                  <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-5 text-(--muted-strong)">
-                    {item.preview}
-                  </p>
-                </button>
-              );
-            })}
+                ) : null}
+                {error ? (
+                  <div className="border border-(--danger) bg-(--surface-raised) p-5 text-sm text-(--danger)">
+                    {error}
+                  </div>
+                ) : null}
+                {!loading && !error && !hasNotifications ? (
+                  <div className="grid min-h-[180px] place-items-center border border-(--border) bg-(--surface-raised) p-6 text-center">
+                    <p className="text-sm leading-6 text-(--muted-strong)">아직 받은 알림이 없습니다.</p>
+                  </div>
+                ) : null}
+                {notifications.map((item) => {
+                  const selectedItem = selected != null && item.id === selected.id;
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => selectNotification(item)}
+                      className={[
+                        "grid h-[116px] min-w-0 content-start gap-2 overflow-hidden border p-4 text-left transition duration-150",
+                        selectedItem
+                          ? "border-(--accent) bg-(--accent-soft)"
+                          : "border-(--border) bg-(--surface-raised) hover:border-(--accent)",
+                      ].join(" ")}
+                    >
+                      <div className="flex min-w-0 items-center justify-between gap-3">
+                        <span className="border border-(--border) bg-(--surface-soft) px-2 py-0.5 text-xs font-semibold text-(--muted-strong)">
+                          {kindLabel[item.type]}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="text-xs text-(--muted-strong)">{formatNotificationTime(item.createdAt)}</span>
+                          {item.unread ? <span className="size-2 rounded-full bg-(--accent)" /> : null}
+                        </div>
+                      </div>
+                      <strong className="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-base">
+                        {item.title}
+                      </strong>
+                      <p className="line-clamp-2 min-w-0 text-sm leading-5 text-(--muted-strong)">{item.preview}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </aside>
+
+            <main className="min-h-[520px] border border-(--border) bg-white shadow-[0_18px_50px_rgba(51,94,180,0.08)] dark:bg-(--surface)">
+              {selected ? (
+                <article className="grid min-h-[520px] grid-rows-[auto_minmax(0,1fr)]">
+                  <header className="border-b border-(--border) p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span className="border border-(--border) bg-(--surface-soft) px-2 py-0.5 text-xs font-semibold text-(--muted-strong)">
+                        {kindLabel[selected.type]}
+                      </span>
+                      <span className="text-sm text-(--muted-strong)">{formatNotificationTime(selected.createdAt)}</span>
+                    </div>
+                    <h2 className="mt-3 text-2xl font-semibold">{selected.title}</h2>
+                    <p className="mt-2 text-sm leading-6 text-(--muted-strong)">{selected.preview}</p>
+                  </header>
+
+                  <div className="themed-scrollbar min-h-0 overflow-y-auto p-5">
+                    <dl className="grid border-y border-(--border)">
+                      <div className="grid gap-1 border-b border-(--border) py-4 sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-4">
+                        <dt className="text-xs font-semibold text-(--muted-strong)">알림 대상</dt>
+                        <dd className="min-w-0 font-semibold">
+                          {selected.targetUrl ? (
+                            <Link href={selected.targetUrl} className="text-(--accent)">
+                              {selected.targetType ?? "대상"} {selected.targetId ? `#${selected.targetId}` : ""}
+                            </Link>
+                          ) : (
+                            <>
+                              {selected.targetType ?? "대상 없음"} {selected.targetId ? `#${selected.targetId}` : ""}
+                            </>
+                          )}
+                        </dd>
+                      </div>
+
+                      <div className="grid gap-1 py-4 sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-4">
+                        <dt className="text-xs font-semibold text-(--muted-strong)">발신자</dt>
+                        <dd className="font-semibold">{selected.actorName}</dd>
+                      </div>
+                    </dl>
+
+                    <div className="mt-5 border border-(--border) bg-(--surface-raised) p-5">
+                      <p className="text-sm leading-7 text-(--muted-strong)">{selected.body}</p>
+                    </div>
+                  </div>
+                </article>
+              ) : (
+                <div className="grid min-h-[520px] place-items-center p-6 text-center">
+                  <div>
+                    <h2 className="text-xl font-semibold">선택된 알림이 없습니다.</h2>
+                    <p className="mt-2 text-sm text-(--muted-strong)">
+                      {hasNotifications ? "왼쪽 목록에서 알림을 선택해 주세요." : "아직 받은 알림이 없습니다."}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </main>
           </div>
-        </aside>
-
-        <main className="themed-scrollbar min-h-0 overflow-y-auto border border-(--border) bg-(--surface) p-6 shadow-(--shadow)">
-          <div className="grid gap-5">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-(--border) pb-5">
-              <div>
-                <span className="border border-(--border) bg-(--surface-soft) px-2 py-0.5 text-xs font-semibold text-(--muted-strong)">
-                  {kindLabel[selected.kind]}
-                </span>
-                <h2 className="mt-3 text-2xl font-semibold">{selected.title}</h2>
-              </div>
-              <span className="text-sm text-(--muted-strong)">{selected.time}</span>
-            </div>
-
-            <div className="grid gap-4">
-              <div className="grid gap-1 border border-(--border) bg-(--surface-raised) p-4">
-                <span className="text-xs font-semibold text-(--muted-strong)">알림 대상</span>
-                <strong>{selected.target}</strong>
-              </div>
-
-              <div className="grid gap-1 border border-(--border) bg-(--surface-raised) p-4">
-                <span className="text-xs font-semibold text-(--muted-strong)">발신자</span>
-                <strong>{selected.actor}</strong>
-              </div>
-
-              <article className="border border-(--border) bg-(--surface-raised) p-5">
-                <p className="text-sm leading-7 text-(--muted-strong)">{selected.body}</p>
-              </article>
-            </div>
-          </div>
-        </main>
-      </section>
-    </AppShell>
+        </section>
+      </AppShell>
+    </RequireLogin>
   );
 }

@@ -2,13 +2,13 @@
 
 import { Suspense, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { clearGithubSession, readGithubSession } from "@/lib/auth/github";
 import { FetchPost } from "@/lib/api/fetch";
+import { clearGoogleSession, readGoogleSession } from "@/lib/auth/google";
 import { saveAuthSession } from "@/lib/auth/session";
 
 type Result =
   | { ok: true; code: string; redirectUri: string; codeVerifier: string }
-  | { ok: false; message: string };
+  | { ok: false };
 
 type AuthResponse = {
   accessToken: string;
@@ -23,37 +23,32 @@ type AuthResponse = {
   };
 };
 
-const githubCallbackRequests = new Map<string, Promise<AuthResponse>>();
+const googleCallbackRequests = new Map<string, Promise<AuthResponse>>();
 
-function GithubCallbackContent() {
+function GoogleCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const code = useMemo(() => searchParams.get("code") ?? "", [searchParams]);
   const state = useMemo(() => searchParams.get("state") ?? "", [searchParams]);
   const error = useMemo(() => searchParams.get("error") ?? "", [searchParams]);
-  const errorDesc = useMemo(() => searchParams.get("error_description") ?? "", [searchParams]);
 
   useEffect(() => {
     let cancelled = false;
 
     const validateCallback = (): Result => {
-      if (error) {
-        return { ok: false, message: `${error}${errorDesc ? `: ${errorDesc}` : ""}` };
+      if (error || !code || !state) {
+        return { ok: false };
       }
 
-      if (!code || !state) {
-        return { ok: false, message: "GitHub 로그인 응답이 올바르지 않습니다." };
-      }
-
-      const session = readGithubSession();
+      const session = readGoogleSession();
       if (!session) {
-        return { ok: false, message: "GitHub 로그인 세션을 찾을 수 없습니다. 다시 로그인해 주세요." };
+        return { ok: false };
       }
 
       if (session.state !== state) {
-        clearGithubSession();
-        return { ok: false, message: "GitHub 로그인 검증에 실패했습니다. 다시 로그인해 주세요." };
+        clearGoogleSession();
+        return { ok: false };
       }
 
       return { ok: true, code, redirectUri: session.redirectUri, codeVerifier: session.verifier };
@@ -69,20 +64,20 @@ function GithubCallbackContent() {
       try {
         const requestKey = `${state}:${result.code}`;
         const request =
-          githubCallbackRequests.get(requestKey) ??
-          (FetchPost("/auth/github", {
+          googleCallbackRequests.get(requestKey) ??
+          (FetchPost("/auth/google", {
             code: result.code,
             redirectUri: result.redirectUri,
             codeVerifier: result.codeVerifier,
           }) as Promise<AuthResponse>);
 
-        githubCallbackRequests.set(requestKey, request);
+        googleCallbackRequests.set(requestKey, request);
         const auth = await request;
 
         if (cancelled) return;
 
         saveAuthSession(auth.accessToken, auth.user);
-        clearGithubSession();
+        clearGoogleSession();
         router.replace(auth.user.profileCompleted ? "/" : "/auth/complete-profile");
       } catch {
         if (cancelled) return;
@@ -96,15 +91,15 @@ function GithubCallbackContent() {
     return () => {
       cancelled = true;
     };
-  }, [code, state, error, errorDesc, router]);
+  }, [code, state, error, router]);
 
   return null;
 }
 
-export default function GithubCallbackPage() {
+export default function GoogleCallbackPage() {
   return (
     <Suspense fallback={null}>
-      <GithubCallbackContent />
+      <GoogleCallbackContent />
     </Suspense>
   );
 }
