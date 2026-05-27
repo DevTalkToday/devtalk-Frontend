@@ -28,7 +28,6 @@ export default function CompleteProfilePage() {
     terms: false,
     privacy: false,
   });
-  const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canSubmit = useMemo(() => {
@@ -44,7 +43,6 @@ export default function CompleteProfilePage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage("");
 
     if (!canSubmit || isSubmitting) return;
 
@@ -61,8 +59,8 @@ export default function CompleteProfilePage() {
       const accessToken = localStorage.getItem("accessToken");
       if (accessToken) saveAuthSession(accessToken, user);
       router.replace("/");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "프로필 저장에 실패했습니다.");
+    } catch {
+      // Request helper shows a toast with a safe message.
     } finally {
       setIsSubmitting(false);
     }
@@ -134,8 +132,6 @@ export default function CompleteProfilePage() {
           value={consents}
           onChange={(name, checked) => setConsents((current) => ({ ...current, [name]: checked }))}
         />
-
-        {message ? <p className="mt-4 text-sm text-(--danger)">{message}</p> : null}
 
         <Button type="submit" variant="primary" fullWidth disabled={!canSubmit || isSubmitting} className="mt-6">
           {isSubmitting ? "저장 중" : "완료"}

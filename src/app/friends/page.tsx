@@ -7,6 +7,7 @@ import { RequireLogin } from "@/components/auth/require-login";
 import { AppShell } from "@/components/devtalk/app-shell";
 import { Button } from "@/components/ui";
 import { FetchDeleteAuth, FetchGetAuth, FetchPatchAuth, FetchPostAuth } from "@/lib/api/fetch";
+import { getProfileHref } from "@/lib/profile/links";
 
 type FriendTab = "friends" | "received" | "sent";
 type Relationship = "NONE" | "FRIEND" | "SENT" | "RECEIVED";
@@ -91,11 +92,12 @@ function ProfileCard({
   onDelete: (id: number) => void;
 }) {
   const person = friendship.user;
+  const profileHref = getProfileHref(person);
 
   return (
     <article className="grid gap-4 rounded-[24px] border border-(--border) bg-(--surface-raised) p-5 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
       <Link
-        href={`/profile/${person.id}`}
+        href={profileHref}
         className="grid size-14 place-items-center rounded-full text-lg font-bold text-white"
         style={{ backgroundColor: getAccent(person.id) }}
         aria-label={`${person.nickname} 프로필`}
@@ -105,7 +107,7 @@ function ProfileCard({
 
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <Link href={`/profile/${person.id}`} className="text-lg font-semibold transition hover:text-(--accent)">
+          <Link href={profileHref} className="text-lg font-semibold transition hover:text-(--accent)">
             {person.nickname}
           </Link>
           <span className="rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1 text-xs font-semibold text-(--muted-strong)">
@@ -163,6 +165,7 @@ function SearchCard({
   onRequest: (userId: number) => void;
 }) {
   const disabled = busy || result.relationship !== "NONE";
+  const profileHref = getProfileHref(result.user);
   const labelByRelationship: Record<Relationship, string> = {
     NONE: "친구 요청",
     FRIEND: "이미 친구",
@@ -173,7 +176,7 @@ function SearchCard({
   return (
     <article className="grid gap-4 rounded-[20px] border border-(--border) bg-(--surface-raised) p-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
       <Link
-        href={`/profile/${result.user.id}`}
+        href={profileHref}
         className="grid size-12 place-items-center rounded-full text-base font-bold text-white"
         style={{ backgroundColor: getAccent(result.user.id) }}
         aria-label={`${result.user.nickname} 프로필`}
@@ -181,7 +184,7 @@ function SearchCard({
         {result.user.nickname.slice(0, 1).toUpperCase()}
       </Link>
       <div className="min-w-0">
-        <Link href={`/profile/${result.user.id}`} className="font-semibold transition hover:text-(--accent)">
+        <Link href={profileHref} className="font-semibold transition hover:text-(--accent)">
           {result.user.nickname}
         </Link>
         <p className="mt-1 text-sm text-(--muted-strong)">{getDescription(result.user)}</p>

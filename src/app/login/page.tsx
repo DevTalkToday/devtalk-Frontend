@@ -10,6 +10,7 @@ import { startGoogleLogin } from "@/lib/auth/google";
 import { Button, Input } from "@/components/ui";
 import { FetchPost } from "@/lib/api/fetch";
 import { saveAuthSession } from "@/lib/auth/session";
+import { showErrorToast } from "@/lib/toast/events";
 
 type AuthResponse = {
   accessToken: string;
@@ -20,7 +21,6 @@ export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canSubmit = username.trim().length > 0 && password.length > 0 && !isSubmitting;
@@ -31,7 +31,6 @@ export default function LoginPage() {
 
     try {
       setIsSubmitting(true);
-      setMessage("");
       const auth = (await FetchPost("/auth/login", {
         username: username.trim(),
         password,
@@ -39,10 +38,26 @@ export default function LoginPage() {
 
       saveAuthSession(auth.accessToken, auth.user);
       router.replace("/");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "로그인에 실패했습니다.");
+    } catch {
+      // Request helper shows a toast with a safe message.
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleLogin = () => {
+    try {
+      startGoogleLogin();
+    } catch {
+      showErrorToast("소셜 로그인을 시작하지 못했습니다.");
+    }
+  };
+
+  const handleGithubLogin = () => {
+    try {
+      startGithubLogin();
+    } catch {
+      showErrorToast("소셜 로그인을 시작하지 못했습니다.");
     }
   };
 
@@ -110,12 +125,6 @@ export default function LoginPage() {
             />
           </div>
 
-          {message ? (
-            <p className="mt-4 rounded-[16px] border border-(--danger) bg-(--surface-soft) px-4 py-3 text-sm text-(--danger)">
-              {message}
-            </p>
-          ) : null}
-
           <Button type="submit" variant="primary" fullWidth disabled={!canSubmit} className="mt-6">
             {isSubmitting ? "로그인 중..." : "로그인"}
           </Button>
@@ -127,12 +136,12 @@ export default function LoginPage() {
           </div>
 
           <div className="grid gap-3">
-            <Button type="button" fullWidth onClick={() => startGoogleLogin()} className="justify-start px-5">
+            <Button type="button" fullWidth onClick={handleGoogleLogin} className="justify-start px-5">
               <Image src="/google.svg" alt="" width={20} height={20} className="size-5" />
               <span className="flex-1 text-center">Google로 계속하기</span>
             </Button>
 
-            <Button type="button" fullWidth onClick={() => startGithubLogin()} className="justify-start px-5">
+            <Button type="button" fullWidth onClick={handleGithubLogin} className="justify-start px-5">
               <Image src="/github.svg" alt="" width={20} height={20} className="theme-icon size-5" />
               <span className="flex-1 text-center">GitHub로 계속하기</span>
             </Button>

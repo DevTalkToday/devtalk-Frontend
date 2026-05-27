@@ -99,7 +99,6 @@ export default function ProfilePage() {
   const [imageFileName, setImageFileName] = useState("");
   const [imageError, setImageError] = useState("");
   const [isImageDragActive, setIsImageDragActive] = useState(false);
-  const [profileError, setProfileError] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
 
@@ -151,7 +150,6 @@ export default function ProfilePage() {
     setDraftDescription(user?.description?.trim() ?? "");
     setDraftMajors(cleanMajors(savedMajors));
     setNewMajor("");
-    setProfileError("");
     setActiveTab("info");
     setIsMenuOpen(false);
     setIsEditing(true);
@@ -166,7 +164,6 @@ export default function ProfilePage() {
     if (savingProfile) return;
 
     setSavingProfile(true);
-    setProfileError("");
     try {
       const nextUser = (await FetchPatchAuth("/profile/me", {
         nickname: draftNickname.trim() || nickname,
@@ -178,8 +175,8 @@ export default function ProfilePage() {
       setIsEditing(false);
       setNewMajor("");
       await profileQuery.refetch();
-    } catch (caught) {
-      setProfileError(caught instanceof Error ? caught.message : "프로필 저장에 실패했습니다.");
+    } catch {
+      // Request helper shows a toast with a safe message.
     } finally {
       setSavingProfile(false);
     }
@@ -263,8 +260,8 @@ export default function ProfilePage() {
       persistUser(nextUser);
       await profileQuery.refetch();
       closeImageModal();
-    } catch (caught) {
-      setImageError(caught instanceof Error ? caught.message : "이미지 저장에 실패했습니다. 더 작은 파일을 선택해주세요.");
+    } catch {
+      // Request helper shows a toast with a safe message.
     } finally {
       setSavingImage(false);
     }
@@ -456,8 +453,6 @@ export default function ProfilePage() {
             {profileQuery.isError ? (
               <p className="text-sm font-semibold text-(--danger)">프로필을 불러오지 못했습니다.</p>
             ) : null}
-            {profileError ? <p className="text-sm font-semibold text-(--danger)">{profileError}</p> : null}
-
             <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-2xl border border-(--border) bg-(--surface-raised) p-4">
                 <dt className="text-xs font-bold text-(--muted)">이름</dt>

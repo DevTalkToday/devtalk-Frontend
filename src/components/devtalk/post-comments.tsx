@@ -9,6 +9,7 @@ import { Button, Field, Textarea } from "@/components/ui";
 import { FetchDeleteAuth, FetchPatchAuth, FetchPostAuth, FetchPutAuth } from "@/lib/api/fetch";
 import { isLoggedIn } from "@/lib/auth/session";
 import { type PostCategory, type PostComment, type PostDetail } from "@/lib/posts/types";
+import { getProfileHref } from "@/lib/profile/links";
 
 type CommentAction =
   | { type: "create"; body: string }
@@ -57,9 +58,6 @@ const formatDateTime = (value: string) =>
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
-
-const getMutationErrorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : "요청을 처리하지 못했습니다.";
 
 export function PostComments({
   post,
@@ -111,7 +109,6 @@ export function PostComments({
   });
 
   const activeCommentAction = commentMutation.isPending ? commentMutation.variables ?? null : null;
-  const commentMutationError = commentMutation.isError ? getMutationErrorMessage(commentMutation.error) : "";
   const isCreatingComment = activeCommentAction?.type === "create";
   const isEditingPending = (commentId: string) =>
     activeCommentAction?.type === "edit" && activeCommentAction.commentId === commentId;
@@ -212,9 +209,6 @@ export function PostComments({
             {isCreatingComment ? "등록 중..." : composerCopy.submitLabel}
           </Button>
         </div>
-        {commentMutationError ? (
-          <div className="rounded-2xl border border-(--danger) bg-(--surface) px-4 py-3 text-sm text-(--danger)">{commentMutationError}</div>
-        ) : null}
       </div>
 
       {orderedComments.length ? (
@@ -257,7 +251,7 @@ export function PostComments({
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
-                        href={`/profile/${comment.author.id}`}
+                        href={getProfileHref(comment.author)}
                         className={[
                           "font-semibold transition hover:text-(--accent)",
                           isPostAuthorComment ? "rounded-md bg-[rgba(255,229,130,0.32)] px-2 py-0.5" : "",

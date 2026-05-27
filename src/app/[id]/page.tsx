@@ -12,6 +12,7 @@ import { PostComments } from "@/components/devtalk/post-comments";
 import { Button, buttonClassName } from "@/components/ui";
 import { FetchDeleteAuth, FetchGet } from "@/lib/api/fetch";
 import { BUG_STATUS_LABELS, CATEGORY_LABELS, type PostDetail } from "@/lib/posts/types";
+import { getProfileHref } from "@/lib/profile/links";
 
 const formatDateTime = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
@@ -66,7 +67,7 @@ export default function PostDetailPage() {
     return post.comments.find((comment) => comment.id === acceptedCommentId) ?? null;
   }, [post]);
 
-  const authorProfileHref = post ? `/profile/${post.author.id}` : "/profile";
+  const authorProfileHref = getProfileHref(post?.author);
 
   const syncPost = (nextPost: PostDetail) => {
     queryClient.setQueryData(["post", id], nextPost);
@@ -201,7 +202,7 @@ export default function PostDetailPage() {
                     label="Accepted"
                     value={
                       acceptedComment ? (
-                        <Link href={`/profile/${acceptedComment.author.id}`} className="transition hover:text-(--accent)">
+                        <Link href={getProfileHref(acceptedComment.author)} className="transition hover:text-(--accent)">
                           {acceptedComment.author.nickname}
                         </Link>
                       ) : (

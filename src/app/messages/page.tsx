@@ -65,10 +65,6 @@ function formatMessageTime(value: string) {
   }).format(target);
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "요청을 처리하지 못했습니다.";
-}
-
 function Avatar({ user, size = "md" }: { user: MessageUser; size?: "md" | "lg" }) {
   return (
     <div
@@ -97,7 +93,6 @@ function MessagesContent() {
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.user.id === selectedId) ?? null,
@@ -126,7 +121,6 @@ function MessagesContent() {
 
     const run = async () => {
       setLoadingConversations(true);
-      setError("");
       try {
         const data = (await FetchGetAuth("/messages/conversations")) as Conversation[];
         if (!alive) return;
@@ -140,11 +134,10 @@ function MessagesContent() {
         if (!hasRequestedUser && nextSelectedId != null) {
           router.replace(`/messages?userId=${nextSelectedId}`, { scroll: false });
         }
-      } catch (caught) {
+      } catch {
         if (alive) {
           setConversations([]);
           setSelectedId(null);
-          setError(getErrorMessage(caught));
         }
       } finally {
         if (alive) setLoadingConversations(false);
@@ -167,16 +160,14 @@ function MessagesContent() {
 
     const run = async () => {
       setLoadingMessages(true);
-      setError("");
       try {
         const data = await fetchConversationMessages(selectedId);
         if (!alive) return;
 
         setMessages(data);
-      } catch (caught) {
+      } catch {
         if (alive) {
           setMessages([]);
-          setError(getErrorMessage(caught));
         }
       } finally {
         if (alive) setLoadingMessages(false);
@@ -233,14 +224,12 @@ function MessagesContent() {
     if (!body || selectedId == null || sending) return;
 
     setSending(true);
-    setError("");
     try {
       const message = (await FetchPostAuth("/messages", { recipientId: selectedId, body })) as ApiMessage;
       setMessages((current) => [...current, message]);
       setDraft("");
       await refreshConversations().catch(() => undefined);
-    } catch (caught) {
-      setError(getErrorMessage(caught));
+    } catch {
     } finally {
       setSending(false);
     }
@@ -317,7 +306,6 @@ function MessagesContent() {
             </header>
 
             <div className="themed-scrollbar min-h-0 space-y-3 overflow-y-auto p-5">
-              {error ? <p className="text-sm text-(--danger)">{error}</p> : null}
               {loadingMessages ? <p className="text-sm text-(--muted-strong)">메시지를 불러오는 중입니다.</p> : null}
               {!loadingMessages && selectedUser && messages.length === 0 ? (
                 <p className="text-sm text-(--muted-strong)">아직 주고받은 메시지가 없습니다.</p>

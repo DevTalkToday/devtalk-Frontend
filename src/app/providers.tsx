@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { ToastViewport } from "@/components/ui/toast-viewport";
 import { ensureAccessToken } from "@/lib/auth/session";
 import { QueryProvider } from "@/lib/query/provider";
 
@@ -14,7 +15,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeProvider>
-      <QueryProvider>{children}</QueryProvider>
+      <QueryProvider>
+        {children}
+        <ToastViewport />
+      </QueryProvider>
     </ThemeProvider>
   );
 }
