@@ -144,6 +144,16 @@ export default function LoginPage() {
               회원가입
             </Link>
           </p>
+
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-(--muted-strong)">
+            <Link href="/legal/terms" className="transition hover:text-(--foreground)">
+              이용약관
+            </Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/legal/privacy" className="transition hover:text-(--foreground)">
+              개인정보 처리방침
+            </Link>
+          </div>
         </form>
       </section>
     </main>

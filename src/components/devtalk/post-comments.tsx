@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
@@ -227,7 +228,7 @@ export function PostComments({
             const isPostAuthorComment = comment.author.id === post.author.id;
             const menuItems: MenuItem[] = [];
 
-            if (canAccept) {
+            if (canAccept && comment.canAccept) {
               menuItems.push({
                 label: comment.isAccepted ? "채택 취소" : "댓글 채택",
                 tone: comment.isAccepted ? "accent" : "default",
@@ -236,10 +237,13 @@ export function PostComments({
               });
             }
 
-            menuItems.push(
-              { label: "수정", onSelect: () => startEditingComment(comment), disabled: commentMutation.isPending },
-              { label: "삭제", tone: "danger", onSelect: () => removeComment(comment.id), disabled: commentMutation.isPending }
-            );
+            if (comment.canEdit) {
+              menuItems.push({ label: "수정", onSelect: () => startEditingComment(comment), disabled: commentMutation.isPending });
+            }
+
+            if (comment.canDelete) {
+              menuItems.push({ label: "삭제", tone: "danger", onSelect: () => removeComment(comment.id), disabled: commentMutation.isPending });
+            }
 
             return (
               <article
@@ -252,15 +256,15 @@ export function PostComments({
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <strong
-                        className={
-                          isPostAuthorComment
-                            ? "rounded-md bg-[rgba(255,229,130,0.32)] px-2 py-0.5"
-                            : undefined
-                        }
+                      <Link
+                        href={`/profile/${comment.author.id}`}
+                        className={[
+                          "font-semibold transition hover:text-(--accent)",
+                          isPostAuthorComment ? "rounded-md bg-[rgba(255,229,130,0.32)] px-2 py-0.5" : "",
+                        ].join(" ")}
                       >
                         {comment.author.nickname}
-                      </strong>
+                      </Link>
                       <span className="text-sm text-(--muted)">{comment.author.role}</span>
                       <span className="text-sm text-(--muted)">· {formatDateTime(comment.createdAt)}</span>
                       {isEdited ? <span className="text-sm text-(--muted)">· 수정됨</span> : null}
@@ -271,10 +275,12 @@ export function PostComments({
                       ) : null}
                     </div>
                   </div>
-                  <CommentActionsMenu
-                    disabled={commentMutation.isPending}
-                    items={menuItems}
-                  />
+                  {menuItems.length ? (
+                    <CommentActionsMenu
+                      disabled={commentMutation.isPending}
+                      items={menuItems}
+                    />
+                  ) : null}
                 </div>
 
                 {isEditing ? (
