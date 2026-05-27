@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { buttonClassName } from "@/components/ui";
 import { FetchGetAuth, FetchPostAuth } from "@/lib/api/fetch";
 import { clearAuthSession, getAuthUser, issueFreshGuestToken, useAuthStatus } from "@/lib/auth/session";
+import { getProfileHref } from "@/lib/profile/links";
 
 type AppShellProps = {
   title?: string;
@@ -21,6 +22,7 @@ type AppShellProps = {
 };
 
 type ShellAuthUser = {
+  id?: number | string | null;
   username?: string | null;
   nickname?: string | null;
   avatarUrl?: string | null;
@@ -66,6 +68,7 @@ export function AppShell({
   const profileName = authUser?.nickname?.trim() || authUser?.username?.trim() || "U";
   const profileAvatarUrl = authUser?.avatarUrl?.trim() || "";
   const profileInitial = profileName.slice(0, 1).toUpperCase() || "U";
+  const profileHref = authUser ? getProfileHref(authUser) : "/profile";
 
   useEffect(() => {
     let alive = true;
@@ -162,7 +165,7 @@ export function AppShell({
               })}
 
               <Link
-                href="/profile"
+                href={profileHref}
                 title="프로필"
                 aria-label="프로필"
                 className={[

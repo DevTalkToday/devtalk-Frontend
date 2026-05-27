@@ -36,7 +36,6 @@ export default function SignupPage() {
     terms: false,
     privacy: false,
   });
-  const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const passwordMatches = password.length > 0 && password === passwordConfirm;
@@ -59,7 +58,6 @@ export default function SignupPage() {
 
   const submitSignup = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage("");
 
     if (!canSubmit || isSubmitting) return;
 
@@ -75,8 +73,8 @@ export default function SignupPage() {
 
       saveAuthSession(auth.accessToken, auth.user);
       router.replace("/");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "회원가입에 실패했습니다.");
+    } catch {
+      // Request helper shows a toast with a safe message.
     } finally {
       setIsSubmitting(false);
     }
@@ -148,8 +146,6 @@ export default function SignupPage() {
         </section>
 
         <PolicyConsentFields value={consents} onChange={updateConsent} />
-
-        {message ? <p className="mt-4 text-sm text-(--danger)">{message}</p> : null}
 
         <Button type="submit" variant="primary" fullWidth disabled={!canSubmit || isSubmitting} className="mt-6">
           {isSubmitting ? "가입 중" : "가입하기"}

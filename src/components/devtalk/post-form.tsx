@@ -16,6 +16,7 @@ import {
   type PostCategory,
   type PostDetail,
 } from "@/lib/posts/types";
+import { showErrorToast } from "@/lib/toast/events";
 
 type Props = {
   mode: "create" | "edit";
@@ -81,7 +82,6 @@ export function PostForm({ mode, postId, initialPost }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => createInitialState(initialPost));
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
 
   const canSubmit = form.title.trim().length > 0 && form.content.trim().length > 0;
 
@@ -90,10 +90,13 @@ export function PostForm({ mode, postId, initialPost }: Props) {
   };
 
   const submit = async () => {
-    if (!canSubmit || submitting) return;
+    if (submitting) return;
+    if (!canSubmit) {
+      showErrorToast("필수 정보를 입력해주세요.");
+      return;
+    }
 
     setSubmitting(true);
-    setError("");
 
     try {
       const payload = {
@@ -121,6 +124,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
                 actual: form.bugActual,
                 reproductionSteps: fromLines(form.bugSteps),
                 labels: fromCsv(form.bugLabelsText),
+                watchers: initialPost?.bug?.watchers ?? 0,
               }
             : undefined,
       };
@@ -132,8 +136,8 @@ export function PostForm({ mode, postId, initialPost }: Props) {
 
       const id = (response as PostDetail).id;
       startTransition(() => router.push(`/${id}`));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "저장 중 오류가 발생했습니다.");
+    } catch {
+      // Request helper shows a toast with a safe message.
     } finally {
       setSubmitting(false);
     }
@@ -322,7 +326,6 @@ export function PostForm({ mode, postId, initialPost }: Props) {
               ? "저장하면 피드와 상세 화면에 바로 반영됩니다."
               : "기존 메타 정보와 본문을 최신 해결 기록으로 갱신합니다."}
           </p>
-          {error ? <p className="text-sm text-(--danger)">{error}</p> : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

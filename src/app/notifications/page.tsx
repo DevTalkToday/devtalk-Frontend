@@ -57,15 +57,10 @@ function formatNotificationTime(value: string) {
   }).format(target);
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "알림을 불러오지 못했습니다.";
-}
-
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   const selected = useMemo(
     () => notifications.find((item) => item.id === selectedId) ?? notifications[0] ?? null,
@@ -86,17 +81,15 @@ export default function NotificationsPage() {
 
     const run = async () => {
       setLoading(true);
-      setError("");
       try {
         const data = (await FetchGetAuth("/notifications?limit=100")) as NotificationItem[];
         if (!alive) return;
         setNotifications(data);
         setSelectedId(data[0]?.id ?? null);
-      } catch (caught) {
+      } catch {
         if (alive) {
           setNotifications([]);
           setSelectedId(null);
-          setError(getErrorMessage(caught));
         }
       } finally {
         if (alive) setLoading(false);
@@ -164,12 +157,7 @@ export default function NotificationsPage() {
                     알림을 불러오는 중입니다.
                   </div>
                 ) : null}
-                {error ? (
-                  <div className="border border-(--danger) bg-(--surface-raised) p-5 text-sm text-(--danger)">
-                    {error}
-                  </div>
-                ) : null}
-                {!loading && !error && !hasNotifications ? (
+                {!loading && !hasNotifications ? (
                   <div className="grid min-h-[180px] place-items-center border border-(--border) bg-(--surface-raised) p-6 text-center">
                     <p className="text-sm leading-6 text-(--muted-strong)">아직 받은 알림이 없습니다.</p>
                   </div>
