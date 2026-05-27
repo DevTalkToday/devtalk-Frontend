@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
@@ -65,6 +66,8 @@ export default function PostDetailPage() {
     return post.comments.find((comment) => comment.id === acceptedCommentId) ?? null;
   }, [post]);
 
+  const authorProfileHref = post ? `/profile/${post.author.id}` : "/profile";
+
   const syncPost = (nextPost: PostDetail) => {
     queryClient.setQueryData(["post", id], nextPost);
     void queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -101,14 +104,18 @@ export default function PostDetailPage() {
           </Link>
           {post ? (
             <>
-              <Link href={`/${post.id}/edit`} className={buttonClassName()}>
-                <PenIcon className="size-4" />
-                수정
-              </Link>
-              <Button type="button" variant="danger" onClick={removePost} disabled={deleting}>
-                <TrashIcon className="size-4" />
-                {deleting ? "삭제 중..." : "삭제"}
-              </Button>
+              {post.canEdit ? (
+                <Link href={`/${post.id}/edit`} className={buttonClassName()}>
+                  <PenIcon className="size-4" />
+                  수정
+                </Link>
+              ) : null}
+              {post.canDelete ? (
+                <Button type="button" variant="danger" onClick={removePost} disabled={deleting}>
+                  <TrashIcon className="size-4" />
+                  {deleting ? "삭제 중..." : "삭제"}
+                </Button>
+              ) : null}
             </>
           ) : null}
         </>
@@ -137,7 +144,12 @@ export default function PostDetailPage() {
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
                 <div className="space-y-2">
                   <h2 className="text-3xl font-semibold tracking-[-0.05em]">{post.title}</h2>
-                  <p className="text-sm leading-6 text-(--muted-strong)">{post.author.nickname} · {post.author.role} · {formatDateTime(post.createdAt)}</p>
+                  <p className="text-sm leading-6 text-(--muted-strong)">
+                    <Link href={authorProfileHref} className="font-semibold text-(--foreground) transition hover:text-(--accent)">
+                      {post.author.nickname}
+                    </Link>{" "}
+                    · {post.author.role} · {formatDateTime(post.createdAt)}
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-sm text-(--muted-strong)">
                   <span className={metricClass}><CommentIcon className="size-4" />{post.commentCount}</span>
@@ -166,7 +178,9 @@ export default function PostDetailPage() {
               <div className="grid gap-3 text-sm">
                 <div className="grid gap-1 rounded-3xl border border-(--border) bg-(--surface-raised) p-4">
                   <span className="text-[0.72rem] font-bold uppercase tracking-[0.24em] text-(--muted)">작성자</span>
-                  <strong className="text-lg">{post.author.nickname}</strong>
+                  <Link href={authorProfileHref} className="text-lg font-semibold transition hover:text-(--accent)">
+                    {post.author.nickname}
+                  </Link>
                   <span className="text-(--muted-strong)">{post.author.role}</span>
                 </div>
                 <div className="grid gap-1 rounded-3xl border border-(--border) bg-(--surface-raised) p-4">
@@ -185,7 +199,15 @@ export default function PostDetailPage() {
                   <InfoCard label="Tried" value={post.question.tried || "미입력"} help="이미 시도한 해결 과정" />
                   <InfoCard
                     label="Accepted"
-                    value={acceptedComment ? acceptedComment.author.nickname : "아직 없음"}
+                    value={
+                      acceptedComment ? (
+                        <Link href={`/profile/${acceptedComment.author.id}`} className="transition hover:text-(--accent)">
+                          {acceptedComment.author.nickname}
+                        </Link>
+                      ) : (
+                        "아직 없음"
+                      )
+                    }
                     help={acceptedComment ? "채택된 댓글이 해결 기록으로 연결되었습니다." : "댓글 메뉴에서 답변을 채택할 수 있습니다."}
                   />
                 </div>
@@ -219,7 +241,7 @@ export default function PostDetailPage() {
   );
 }
 
-function InfoCard({ label, value, help }: { label: string; value: string; help: string }) {
+function InfoCard({ label, value, help }: { label: string; value: ReactNode; help: string }) {
   return (
     <div className="grid gap-1 rounded-3xl border border-(--border) bg-(--surface-raised) p-4">
       <span className="text-[0.72rem] font-bold uppercase tracking-[0.24em] text-(--muted)">{label}</span>

@@ -25,6 +25,9 @@ export type PostComment = {
   updatedAt?: string;
   likeCount: number;
   isAccepted?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canAccept?: boolean;
 };
 
 export type QuestionMeta = {
@@ -65,6 +68,9 @@ export type PostDetail = {
   comments: PostComment[];
   question?: QuestionMeta;
   bug?: BugMeta;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canAcceptComments?: boolean;
 };
 
 export type PostSummary = Omit<PostDetail, "content" | "comments">;

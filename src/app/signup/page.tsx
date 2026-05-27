@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 import MajorMultiSelect from "@/components/MajorMultiSelect";
+import { PolicyConsentFields } from "@/components/legal/policy-consent-fields";
 import { Button, Input } from "@/components/ui";
 import { FetchPost } from "@/lib/api/fetch";
 import { saveAuthSession } from "@/lib/auth/session";
@@ -56,10 +57,6 @@ export default function SignupPage() {
     setConsents((current) => ({ ...current, [name]: checked }));
   };
 
-  const toggleAllConsents = (checked: boolean) => {
-    setConsents({ terms: checked, privacy: checked });
-  };
-
   const submitSignup = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage("");
@@ -84,8 +81,6 @@ export default function SignupPage() {
       setIsSubmitting(false);
     }
   };
-
-  const allConsentsChecked = consents.terms && consents.privacy;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-5 py-10">
@@ -152,37 +147,7 @@ export default function SignupPage() {
           <MajorMultiSelect value={majors} onChange={setMajors} />
         </section>
 
-        <section className="mt-6 rounded-[22px] border border-(--border) bg-(--surface-raised) p-4">
-          <label className="flex items-center gap-3 text-sm font-semibold text-(--foreground)">
-            <input
-              type="checkbox"
-              checked={allConsentsChecked}
-              onChange={(event) => toggleAllConsents(event.target.checked)}
-              className="size-4 accent-(--accent)"
-            />
-            전체 동의
-          </label>
-          <div className="mt-4 space-y-3">
-            <label className="flex items-center gap-3 text-sm text-(--muted-strong)">
-              <input
-                type="checkbox"
-                checked={consents.terms}
-                onChange={(event) => updateConsent("terms", event.target.checked)}
-                className="size-4 accent-(--accent)"
-              />
-              이용약관 동의
-            </label>
-            <label className="flex items-center gap-3 text-sm text-(--muted-strong)">
-              <input
-                type="checkbox"
-                checked={consents.privacy}
-                onChange={(event) => updateConsent("privacy", event.target.checked)}
-                className="size-4 accent-(--accent)"
-              />
-              개인정보 처리방침 동의
-            </label>
-          </div>
-        </section>
+        <PolicyConsentFields value={consents} onChange={updateConsent} />
 
         {message ? <p className="mt-4 text-sm text-(--danger)">{message}</p> : null}
 

@@ -94,16 +94,20 @@ function ProfileCard({
 
   return (
     <article className="grid gap-4 rounded-[24px] border border-(--border) bg-(--surface-raised) p-5 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
-      <div
+      <Link
+        href={`/profile/${person.id}`}
         className="grid size-14 place-items-center rounded-full text-lg font-bold text-white"
         style={{ backgroundColor: getAccent(person.id) }}
+        aria-label={`${person.nickname} 프로필`}
       >
         {person.nickname.slice(0, 1).toUpperCase()}
-      </div>
+      </Link>
 
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-lg font-semibold">{person.nickname}</h3>
+          <Link href={`/profile/${person.id}`} className="text-lg font-semibold transition hover:text-(--accent)">
+            {person.nickname}
+          </Link>
           <span className="rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1 text-xs font-semibold text-(--muted-strong)">
             {getMajor(person)}
           </span>
@@ -168,14 +172,18 @@ function SearchCard({
 
   return (
     <article className="grid gap-4 rounded-[20px] border border-(--border) bg-(--surface-raised) p-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
-      <div
+      <Link
+        href={`/profile/${result.user.id}`}
         className="grid size-12 place-items-center rounded-full text-base font-bold text-white"
         style={{ backgroundColor: getAccent(result.user.id) }}
+        aria-label={`${result.user.nickname} 프로필`}
       >
         {result.user.nickname.slice(0, 1).toUpperCase()}
-      </div>
+      </Link>
       <div className="min-w-0">
-        <h3 className="font-semibold">{result.user.nickname}</h3>
+        <Link href={`/profile/${result.user.id}`} className="font-semibold transition hover:text-(--accent)">
+          {result.user.nickname}
+        </Link>
         <p className="mt-1 text-sm text-(--muted-strong)">{getDescription(result.user)}</p>
       </div>
       <Button type="button" size="sm" disabled={disabled} onClick={() => onRequest(result.user.id)}>

@@ -56,7 +56,12 @@ export default function EditPostPage() {
           수정할 게시글을 찾지 못했습니다.
         </section>
       ) : null}
-      {post ? <PostForm mode="edit" postId={post.id} initialPost={post} /> : null}
+      {post && !post.canEdit ? (
+        <section className="rounded-4xl border border-(--border) bg-(--surface) p-6 text-sm text-(--danger) shadow-(--shadow) backdrop-blur-[18px]">
+          이 게시글을 수정할 권한이 없습니다.
+        </section>
+      ) : null}
+      {post?.canEdit ? <PostForm mode="edit" postId={post.id} initialPost={post} /> : null}
     </AppShell>
   );
 }
