@@ -91,6 +91,15 @@ export function TrashIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function FlagIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M5.5 20V5" />
+      <path d="M5.5 5h10.2l-1.4 3.5 1.4 3.5H5.5" />
+    </svg>
+  );
+}
+
 export function EllipsisIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>

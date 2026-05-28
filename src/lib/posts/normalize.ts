@@ -13,7 +13,7 @@ import {
   type PostPayload,
   type QuestionMeta,
 } from "@/lib/posts/types";
-import { normalizeMajorValues } from "@/lib/mock/majors";
+import { normalizeMajorValues } from "@/lib/majors/normalize";
 
 type UnknownRecord = Record<string, unknown>;
 

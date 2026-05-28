@@ -247,7 +247,6 @@ function PostsPageContent() {
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">필터 설정</h2>
-                <p className="mt-1 text-sm text-(--muted-strong)">목록 조건을 빠르게 조정합니다.</p>
               </div>
               <div className="flex gap-1 border border-(--border) bg-(--surface-raised) p-1">
                 {(["and", "or"] as const).map((mode) => (

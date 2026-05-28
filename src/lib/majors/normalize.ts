@@ -1,6 +1,6 @@
 export type MajorOption = { code: string; label: string };
 
-export const majors: MajorOption[] = [
+const KNOWN_MAJORS: MajorOption[] = [
   { code: "frontend", label: "프론트엔드" },
   { code: "backend", label: "백엔드" },
   { code: "ai", label: "AI" },
@@ -14,7 +14,7 @@ export const getMajorLabel = (value: string) => {
   const normalized = value.trim();
   if (!normalized) return "";
 
-  const matched = majors.find((major) => major.code === normalized || major.label === normalized);
+  const matched = KNOWN_MAJORS.find((major) => major.code === normalized || major.label === normalized);
   return matched?.label ?? normalized;
 };
 
