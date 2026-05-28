@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import MajorMultiSelect from "@/components/MajorMultiSelect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import { Button, ChipGroup, Field, Input, Textarea } from "@/components/ui";
-import { normalizeMajorValues } from "@/lib/mock/majors";
+import { normalizeMajorValues } from "@/lib/majors/normalize";
 import { FetchPostAuth, FetchPutAuth } from "@/lib/api/fetch";
 import {
   BUG_PRIORITIES,

@@ -108,6 +108,7 @@ export default function ProfilePage() {
     queryKey: ["profile", "me"],
     enabled: ready && loggedIn,
     queryFn: () => FetchGetAuth("/profile/me") as Promise<ProfileResponse>,
+    retry: false,
   });
 
   const user = localUser ?? profileQuery.data?.user ?? sessionUser;
@@ -127,12 +128,14 @@ export default function ProfilePage() {
     queryKey: ["profile", "posts", userId],
     enabled: Boolean(userId),
     queryFn: () => FetchGetAuth("/profile/me/posts?page=1&limit=48") as Promise<PostsResponse>,
+    retry: false,
   });
 
   const commentsQuery = useQuery({
     queryKey: ["profile", "comments", userId],
     enabled: Boolean(userId),
     queryFn: () => FetchGetAuth("/profile/me/comments?page=1&limit=48") as Promise<CommentsResponse>,
+    retry: false,
   });
 
   const myPosts = postsQuery.data?.items ?? [];

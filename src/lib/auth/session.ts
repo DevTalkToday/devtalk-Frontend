@@ -37,6 +37,25 @@ export const getAccessToken = () => {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 };
 
+export const getOptionalUserAccessToken = () => {
+  const token = getAccessToken();
+  return isLoggedIn() && token ? token : null;
+};
+
+export const getRequiredAccessToken = () => {
+  if (!isLoggedIn()) {
+    throw new Error("Login is required");
+  }
+
+  const token = getAccessToken();
+  if (!token) {
+    clearAuthSession();
+    throw new Error("Login session expired");
+  }
+
+  return token;
+};
+
 export const clearAuthSession = () => {
   localStorage.removeItem(AUTH_USER_KEY);
   localStorage.removeItem(ACCESS_TOKEN_KEY);

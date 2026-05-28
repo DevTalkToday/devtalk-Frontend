@@ -9,6 +9,7 @@ import { AppShell } from "@/components/devtalk/app-shell";
 import { ArrowLeftIcon, CommentIcon, EyeIcon, HeartIcon, PenIcon, TrashIcon } from "@/components/devtalk/icons";
 import { MarkdownBody } from "@/components/devtalk/markdown-body";
 import { PostComments } from "@/components/devtalk/post-comments";
+import { ReportButton } from "@/components/devtalk/report-dialog";
 import { Button, buttonClassName } from "@/components/ui";
 import { FetchDeleteAuth, FetchGet } from "@/lib/api/fetch";
 import { BUG_STATUS_LABELS, CATEGORY_LABELS, type PostDetail } from "@/lib/posts/types";
@@ -116,6 +117,16 @@ export default function PostDetailPage() {
                   <TrashIcon className="size-4" />
                   {deleting ? "삭제 중..." : "삭제"}
                 </Button>
+              ) : null}
+              {!post.canEdit ? (
+                <ReportButton
+                  target={{
+                    type: "post",
+                    id: post.id,
+                    label: post.title,
+                    url: `/${post.id}`,
+                  }}
+                />
               ) : null}
             </>
           ) : null}

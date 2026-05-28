@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/devtalk/app-shell";
 import { PostCard } from "@/components/devtalk/post-card";
+import { ReportButton } from "@/components/devtalk/report-dialog";
 import { FetchGet } from "@/lib/api/fetch";
+import { getAuthUser, useAuthStatus } from "@/lib/auth/session";
 import { CATEGORY_LABELS, type PostCategory, type PostSummary } from "@/lib/posts/types";
 
 type PublicProfileUser = {
@@ -47,6 +49,10 @@ type CommentsResponse = {
 
 type ProfileTab = "posts" | "comments";
 
+type AuthUser = {
+  id?: number | string | null;
+};
+
 const tabs: Array<{ id: ProfileTab; label: string }> = [
   { id: "posts", label: "게시글" },
   { id: "comments", label: "댓글" },
@@ -77,25 +83,40 @@ const getProfileIdentifier = (user: PublicProfileUser) => {
   return user.email?.trim() || (username ? `@${username}` : "");
 };
 
+const asAuthUser = (value: unknown): AuthUser | null => {
+  if (!value || typeof value !== "object") return null;
+  return value as AuthUser;
+};
+
 export default function PublicProfilePage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const { ready, loggedIn } = useAuthStatus();
   const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
+  const authUser = useMemo(() => (ready && loggedIn ? asAuthUser(getAuthUser()) : null), [ready, loggedIn]);
+  const isOwnProfile = Boolean(id && authUser?.id != null && String(authUser.id) === String(id));
+
+  useEffect(() => {
+    if (isOwnProfile) {
+      router.replace("/profile");
+    }
+  }, [isOwnProfile, router]);
 
   const profileQuery = useQuery({
     queryKey: ["profile", id],
-    enabled: Boolean(id),
+    enabled: Boolean(id) && !isOwnProfile,
     queryFn: () => FetchGet(`/profile/${id}`) as Promise<PublicProfileResponse>,
   });
 
   const postsQuery = useQuery({
     queryKey: ["profile", id, "posts"],
-    enabled: Boolean(id),
+    enabled: Boolean(id) && !isOwnProfile,
     queryFn: () => FetchGet(`/profile/${id}/posts?page=1&limit=24`) as Promise<PostsResponse>,
   });
 
   const commentsQuery = useQuery({
     queryKey: ["profile", id, "comments"],
-    enabled: Boolean(id),
+    enabled: Boolean(id) && !isOwnProfile,
     queryFn: () => FetchGet(`/profile/${id}/comments?page=1&limit=24`) as Promise<CommentsResponse>,
   });
 
@@ -108,6 +129,16 @@ export default function PublicProfilePage() {
   const avatarInitial = nickname.slice(0, 1).toUpperCase() || "U";
   const posts = postsQuery.data?.items ?? [];
   const comments = commentsQuery.data?.items ?? [];
+
+  if (isOwnProfile) {
+    return (
+      <AppShell showPageHeader={false}>
+        <section className="rounded-[28px] border border-(--border) bg-(--surface) p-6 text-sm text-(--muted-strong) shadow-(--shadow)">
+          내 프로필로 이동 중입니다.
+        </section>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell showPageHeader={false}>
@@ -140,9 +171,20 @@ export default function PublicProfilePage() {
             </div>
 
             <div className="grid gap-5">
-              <div>
-                <h1 className="break-words text-3xl font-semibold md:text-4xl">{nickname}</h1>
-                {profileIdentifier ? <p className="mt-2 break-words text-sm text-(--muted-strong)">{profileIdentifier}</p> : null}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <h1 className="break-words text-3xl font-semibold md:text-4xl">{nickname}</h1>
+                  {profileIdentifier ? <p className="mt-2 break-words text-sm text-(--muted-strong)">{profileIdentifier}</p> : null}
+                </div>
+                <ReportButton
+                  size="sm"
+                  target={{
+                    type: "profile",
+                    id: user.id,
+                    label: `${nickname} 프로필`,
+                    url: `/profile/${user.id}`,
+                  }}
+                />
               </div>
 
               <dl className="grid gap-3 sm:grid-cols-3">
@@ -236,6 +278,15 @@ export default function PublicProfilePage() {
                                   채택됨
                                 </span>
                               ) : null}
+                              <ReportButton
+                                size="sm"
+                                target={{
+                                  type: "comment",
+                                  id: comment.id,
+                                  label: `${nickname}님의 댓글: ${comment.body.trim().replace(/\s+/g, " ").slice(0, 60)}`,
+                                  url: comment.targetUrl,
+                                }}
+                              />
                             </div>
                           </div>
                           <p className="whitespace-pre-line text-sm leading-7 text-(--muted-strong)">{comment.body}</p>

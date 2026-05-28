@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { CommentActionsMenu, type MenuItem } from "@/components/devtalk/comment-actions-menu";
+import { ReportDialog, type ReportTarget } from "@/components/devtalk/report-dialog";
 import { Button, Field, Textarea } from "@/components/ui";
 import { FetchDeleteAuth, FetchPatchAuth, FetchPostAuth, FetchPutAuth } from "@/lib/api/fetch";
 import { isLoggedIn } from "@/lib/auth/session";
@@ -70,6 +71,7 @@ export function PostComments({
   const [draftComment, setDraftComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState("");
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
 
   const composerCopy = getComposerCopy(post.category);
   const orderedComments = useMemo(() => {
@@ -239,9 +241,26 @@ export function PostComments({
               menuItems.push({ label: "삭제", tone: "danger", onSelect: () => removeComment(comment.id), disabled: commentMutation.isPending });
             }
 
+            if (!comment.canEdit) {
+              const preview = comment.body.trim().replace(/\s+/g, " ").slice(0, 60);
+              menuItems.push({
+                label: "신고",
+                tone: "danger",
+                onSelect: () =>
+                  setReportTarget({
+                    type: "comment",
+                    id: comment.id,
+                    label: preview ? `${comment.author.nickname}님의 댓글: ${preview}` : `${comment.author.nickname}님의 댓글`,
+                    url: `/${post.id}#comment-${comment.id}`,
+                  }),
+                disabled: commentMutation.isPending,
+              });
+            }
+
             return (
               <article
                 key={comment.id}
+                id={`comment-${comment.id}`}
                 className={[
                   "rounded-3xl border border-(--border) bg-(--surface-raised) p-5 shadow-(--shadow)",
                   comment.isAccepted ? "ring-1 ring-(--accent)" : "",
@@ -322,6 +341,13 @@ export function PostComments({
       ) : (
         <div className="rounded-3xl border border-dashed border-(--border) bg-(--surface-raised) p-6 text-sm text-(--muted-strong)">아직 댓글이 없습니다. 첫 번째 댓글을 남겨 대화를 시작해보세요.</div>
       )}
+      <ReportDialog
+        target={reportTarget}
+        open={Boolean(reportTarget)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setReportTarget(null);
+        }}
+      />
     </section>
   );
 }
