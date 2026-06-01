@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useDeferredValue, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { markdownComponents } from "@/components/devtalk/markdown-components";
@@ -24,6 +24,7 @@ export default function MarkdownEditor({ value, onChange }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [mode, setMode] = useState<"edit" | "preview" | "split">("split");
   const markdown = value ?? "";
+  const previewMarkdown = useDeferredValue(markdown);
 
   const insertAtCursor = (text: string) => {
     const element = ref.current;
@@ -109,7 +110,7 @@ export default function MarkdownEditor({ value, onChange }: Props) {
         {(mode === "preview" || mode === "split") && (
           <div className="min-h-[420px] w-full border-t border-(--border) px-5 py-5 md:border-l md:border-t-0">
             <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={safeUrlTransform} components={markdownComponents}>
-              {markdown}
+              {previewMarkdown}
             </ReactMarkdown>
           </div>
         )}
