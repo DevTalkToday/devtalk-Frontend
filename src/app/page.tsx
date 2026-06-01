@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Suspense, startTransition } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/devtalk/app-shell";
 import { PostCard } from "@/components/devtalk/post-card";
@@ -83,6 +83,7 @@ function HomePageContent() {
   const latestQuery = useQuery({
     queryKey: ["posts", "home-latest", query, page],
     queryFn: () => fetchPosts(latestPath),
+    placeholderData: keepPreviousData,
   });
 
   const popularQuery = useQuery({

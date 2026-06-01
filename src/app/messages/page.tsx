@@ -32,6 +32,7 @@ type Conversation = {
 
 const accentColors = ["#2563ff", "#14b8a6", "#f97316", "#7c3aed", "#0891b2", "#db2777", "#16a34a"];
 const MESSAGE_POLL_INTERVAL_MS = 1000;
+const CONVERSATION_POLL_INTERVAL_MS = 5_000;
 
 function getAccent(id: number) {
   return accentColors[id % accentColors.length];
@@ -65,6 +66,38 @@ function formatMessageTime(value: string) {
   }).format(target);
 }
 
+function hasUnreadIncomingMessages(items: ApiMessage[]) {
+  return items.some((message) => !message.mine && message.readAt == null);
+}
+
+function areMessagesEqual(current: ApiMessage[], next: ApiMessage[]) {
+  return (
+    current.length === next.length &&
+    current.every(
+      (message, index) =>
+        message.id === next[index]?.id &&
+        message.readAt === next[index]?.readAt &&
+        message.body === next[index]?.body
+    )
+  );
+}
+
+function areConversationsEqual(current: Conversation[], next: Conversation[]) {
+  return (
+    current.length === next.length &&
+    current.every((conversation, index) => {
+      const nextConversation = next[index];
+      return (
+        conversation.user.id === nextConversation?.user.id &&
+        conversation.unreadCount === nextConversation.unreadCount &&
+        conversation.lastMessage?.id === nextConversation.lastMessage?.id &&
+        conversation.lastMessage?.readAt === nextConversation.lastMessage?.readAt &&
+        conversation.lastMessage?.body === nextConversation.lastMessage?.body
+      );
+    })
+  );
+}
+
 function Avatar({ user, size = "md" }: { user: MessageUser; size?: "md" | "lg" }) {
   return (
     <div
@@ -85,6 +118,7 @@ function MessagesContent() {
   const userIdParam = searchParams.get("userId");
   const requestedUserId = userIdParam ? Number(userIdParam) : null;
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const markingReadIdsRef = useRef<Set<number>>(new Set());
 
   const [selectedId, setSelectedId] = useState<number | null>(Number.isFinite(requestedUserId) ? requestedUserId : null);
   const [draft, setDraft] = useState("");
@@ -102,16 +136,27 @@ function MessagesContent() {
 
   const refreshConversations = useCallback(async () => {
     const data = (await FetchGetAuth("/messages/conversations")) as Conversation[];
-    setConversations(data);
+    setConversations((current) => (areConversationsEqual(current, data) ? current : data));
     return data;
   }, []);
 
   const fetchConversationMessages = useCallback(
-    async (userId: number) => {
-      const data = (await FetchGetAuth(`/messages/conversations/${userId}?limit=100`)) as ApiMessage[];
-      await FetchPatchAuth(`/messages/conversations/${userId}/read`).catch(() => undefined);
-      await refreshConversations().catch(() => undefined);
-      return data;
+    async (userId: number) => (await FetchGetAuth(`/messages/conversations/${userId}?limit=100`)) as ApiMessage[],
+    [],
+  );
+
+  const markConversationReadIfNeeded = useCallback(
+    async (userId: number, items: ApiMessage[]) => {
+      if (!hasUnreadIncomingMessages(items)) return;
+      if (markingReadIdsRef.current.has(userId)) return;
+
+      markingReadIdsRef.current.add(userId);
+      try {
+        await FetchPatchAuth(`/messages/conversations/${userId}/read`);
+        await refreshConversations().catch(() => undefined);
+      } finally {
+        markingReadIdsRef.current.delete(userId);
+      }
     },
     [refreshConversations],
   );
@@ -122,10 +167,9 @@ function MessagesContent() {
     const run = async () => {
       setLoadingConversations(true);
       try {
-        const data = (await FetchGetAuth("/messages/conversations")) as Conversation[];
+        const data = await refreshConversations();
         if (!alive) return;
 
-        setConversations(data);
         const fromUrl = Number.isFinite(requestedUserId) ? requestedUserId : null;
         const hasRequestedUser = fromUrl != null && data.some((conversation) => conversation.user.id === fromUrl);
         const nextSelectedId = hasRequestedUser ? fromUrl : data[0]?.user.id ?? null;
@@ -148,7 +192,23 @@ function MessagesContent() {
     return () => {
       alive = false;
     };
-  }, [requestedUserId, router]);
+  }, [refreshConversations, requestedUserId, router]);
+
+  useEffect(() => {
+    const interval = window.setInterval(async () => {
+      if (document.hidden) return;
+
+      try {
+        await refreshConversations();
+      } catch {
+        // Keep the current list visible during transient polling failures.
+      }
+    }, CONVERSATION_POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [refreshConversations]);
 
   useEffect(() => {
     if (selectedId == null) {
@@ -164,7 +224,8 @@ function MessagesContent() {
         const data = await fetchConversationMessages(selectedId);
         if (!alive) return;
 
-        setMessages(data);
+        setMessages((current) => (areMessagesEqual(current, data) ? current : data));
+        void markConversationReadIfNeeded(selectedId, data);
       } catch {
         if (alive) {
           setMessages([]);
@@ -178,7 +239,7 @@ function MessagesContent() {
     return () => {
       alive = false;
     };
-  }, [selectedId, fetchConversationMessages]);
+  }, [selectedId, fetchConversationMessages, markConversationReadIfNeeded]);
 
   useEffect(() => {
     if (selectedId == null) return;
@@ -191,13 +252,8 @@ function MessagesContent() {
         const data = await fetchConversationMessages(selectedId);
         if (!alive) return;
 
-        setMessages((current) => {
-          const unchanged =
-            current.length === data.length &&
-            current.every((message, index) => message.id === data[index]?.id && message.readAt === data[index]?.readAt);
-
-          return unchanged ? current : data;
-        });
+        setMessages((current) => (areMessagesEqual(current, data) ? current : data));
+        void markConversationReadIfNeeded(selectedId, data);
       } catch {
         // Keep the current chat visible during transient polling failures.
       }
@@ -207,13 +263,14 @@ function MessagesContent() {
       alive = false;
       window.clearInterval(interval);
     };
-  }, [selectedId, fetchConversationMessages]);
+  }, [selectedId, fetchConversationMessages, markConversationReadIfNeeded]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
   }, [messages.length, selectedId]);
 
   const selectConversation = (userId: number) => {
+    if (selectedId === userId) return;
     setSelectedId(userId);
     router.replace(`/messages?userId=${userId}`, { scroll: false });
   };

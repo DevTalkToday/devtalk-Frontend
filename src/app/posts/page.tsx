@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Suspense, startTransition } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/devtalk/app-shell";
 import { PostCard } from "@/components/devtalk/post-card";
@@ -112,6 +112,7 @@ function PostsPageContent() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["posts", "posts-page", categoryKey || "all", resolutionKey || "all", match, query, sort, page],
     queryFn: () => FetchGet(`/posts?${params.toString()}`) as Promise<PostsResponse>,
+    placeholderData: keepPreviousData,
   });
 
   const items = data?.items ?? [];
