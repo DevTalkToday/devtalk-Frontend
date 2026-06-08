@@ -7,6 +7,7 @@ import { PolicyConsentFields } from "@/components/legal/policy-consent-fields";
 import { Button, Input, Textarea } from "@/components/ui";
 import { FetchPostAuth } from "@/lib/api/fetch";
 import { saveAuthSession } from "@/lib/auth/session";
+import { isKnownMajorValue, normalizeMajorValues } from "@/lib/majors/normalize";
 
 type UserResponse = {
   id: number;
@@ -17,6 +18,11 @@ type UserResponse = {
   profileCompleted: boolean;
 };
 
+const CUSTOM_MAJOR_BUTTON_LABEL = "기타 입력";
+const CUSTOM_MAJOR_PLACEHOLDER = "직접 입력";
+const CUSTOM_MAJOR_MAX_LENGTH = 40;
+const MAX_MAJOR_COUNT = 8;
+
 export default function CompleteProfilePage() {
   const router = useRouter();
   const [nickname, setNickname] = useState("");
@@ -24,22 +30,40 @@ export default function CompleteProfilePage() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [description, setDescription] = useState("");
   const [majors, setMajors] = useState<string[]>([]);
+  const [customMajor, setCustomMajor] = useState("");
+  const [showCustomMajorInput, setShowCustomMajorInput] = useState(false);
   const [consents, setConsents] = useState({
     terms: false,
     privacy: false,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const normalizedCustomMajor = customMajor.trim();
+  const customMajorSelected = showCustomMajorInput || normalizedCustomMajor.length > 0;
+  const selectedMajors = useMemo(
+    () => normalizeMajorValues([...majors, normalizedCustomMajor], MAX_MAJOR_COUNT),
+    [majors, normalizedCustomMajor],
+  );
+
   const canSubmit = useMemo(() => {
     return (
       nickname.trim().length > 0 &&
       password.length >= 8 &&
       password === passwordConfirm &&
-      majors.length > 0 &&
+      selectedMajors.length > 0 &&
       consents.terms &&
       consents.privacy
     );
-  }, [nickname, password, passwordConfirm, majors.length, consents.terms, consents.privacy]);
+  }, [nickname, password, passwordConfirm, selectedMajors.length, consents.terms, consents.privacy]);
+
+  const toggleCustomMajorInput = () => {
+    if (normalizedCustomMajor) {
+      setShowCustomMajorInput(true);
+      return;
+    }
+
+    setShowCustomMajorInput((current) => !current);
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -53,7 +77,7 @@ export default function CompleteProfilePage() {
         password,
         passwordConfirm,
         description: description.trim() || null,
-        majors,
+        majors: selectedMajors,
       })) as UserResponse;
 
       const accessToken = localStorage.getItem("accessToken");
@@ -123,9 +147,40 @@ export default function CompleteProfilePage() {
         <section className="mt-6">
           <div className="mb-3 flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-(--muted-strong)">전공</p>
-            <p className="text-xs text-(--muted)">선택 {majors.length}</p>
+            <p className="text-xs text-(--muted)">선택 {selectedMajors.length}</p>
           </div>
-          <MajorMultiSelect value={majors} onChange={setMajors} />
+
+          <MajorMultiSelect
+            value={majors}
+            onChange={(next) => setMajors(next.filter(isKnownMajorValue))}
+            maxSelect={MAX_MAJOR_COUNT}
+            valueMode="label"
+            afterOptions={(
+              <button
+                type="button"
+                aria-pressed={customMajorSelected}
+                onClick={toggleCustomMajorInput}
+                className={[
+                  "inline-flex items-center justify-center gap-2 rounded-full border px-4 py-3 text-[0.88rem] font-medium transition duration-150",
+                  customMajorSelected
+                    ? "border-(--accent) bg-(--surface-soft) text-(--foreground)"
+                    : "border-(--border) bg-(--surface-raised) text-(--muted-strong) hover:-translate-y-px hover:border-(--accent) hover:bg-(--surface-soft) hover:text-(--foreground)",
+                ].join(" ")}
+              >
+                {CUSTOM_MAJOR_BUTTON_LABEL}
+              </button>
+            )}
+          />
+
+          {customMajorSelected ? (
+            <div className="mt-3">
+              <Input
+                content={CUSTOM_MAJOR_PLACEHOLDER}
+                value={customMajor}
+                onChange={(event) => setCustomMajor(event.target.value.slice(0, CUSTOM_MAJOR_MAX_LENGTH))}
+              />
+            </div>
+          ) : null}
         </section>
 
         <PolicyConsentFields
@@ -134,7 +189,7 @@ export default function CompleteProfilePage() {
         />
 
         <Button type="submit" variant="primary" fullWidth disabled={!canSubmit || isSubmitting} className="mt-6">
-          {isSubmitting ? "저장 중" : "완료"}
+          {isSubmitting ? "저장 중..." : "완료"}
         </Button>
       </form>
     </main>

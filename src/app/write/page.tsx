@@ -11,7 +11,8 @@ export default function WritePage() {
   return (
     <RequireLogin>
       <AppShell
-      title="에러 해결 기록 작성"
+      title="글 작성"
+      description="가이드라인을 준수하여 작성해주세요."
       actions={
         <Link href="/" className={buttonClassName()}>
           <ArrowLeftIcon className="size-4" />

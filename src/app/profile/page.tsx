@@ -8,11 +8,11 @@ import { AppShell } from "@/components/devtalk/app-shell";
 import { EllipsisIcon, PlusIcon, TrashIcon } from "@/components/devtalk/icons";
 import { PostCard } from "@/components/devtalk/post-card";
 import { buttonClassName } from "@/components/ui";
-import { FetchGetAuth, FetchPatchAuth } from "@/lib/api/fetch";
+import { FetchGetAuth, FetchGetAuthSilent, FetchPatchAuth } from "@/lib/api/fetch";
 import { getAccessToken, getAuthUser, saveAuthSession, useAuthStatus } from "@/lib/auth/session";
 import { CATEGORY_LABELS, type PostCategory, type PostSummary } from "@/lib/posts/types";
 
-type ProfileTab = "info" | "posts" | "comments";
+type ProfileTab = "info" | "posts" | "comments" | "bookmarks";
 
 type AuthUser = {
   id?: number | string;
@@ -58,6 +58,7 @@ const tabs: Array<{ id: ProfileTab; label: string }> = [
   { id: "info", label: "내 정보" },
   { id: "posts", label: "내 게시글" },
   { id: "comments", label: "내 댓글" },
+  { id: "bookmarks", label: "내 북마크" },
 ];
 
 const asAuthUser = (value: unknown): AuthUser | null => {
@@ -138,8 +139,16 @@ export default function ProfilePage() {
     retry: false,
   });
 
+  const bookmarksQuery = useQuery({
+    queryKey: ["profile", "bookmarks", userId],
+    enabled: Boolean(userId) && activeTab === "bookmarks",
+    queryFn: () => FetchGetAuthSilent("/profile/me/bookmarks?page=1&limit=48") as Promise<PostsResponse>,
+    retry: false,
+  });
+
   const myPosts = postsQuery.data?.items ?? [];
   const myComments = commentsQuery.data?.items ?? [];
+  const myBookmarks = bookmarksQuery.data?.items ?? [];
 
   const persistUser = (nextUser: AuthUser) => {
     const accessToken = getAccessToken();
@@ -250,7 +259,7 @@ export default function ProfilePage() {
 
   const saveProfileImage = async () => {
     if (!imageDraftUrl) {
-      setImageError("이미지 파일을 선택해주세요.");
+      setImageError("이미지 파일을 선택해 주세요.");
       return;
     }
 
@@ -294,7 +303,7 @@ export default function ProfilePage() {
               onChange={(event) => setDraftDescription(event.target.value)}
               rows={5}
               className="min-h-32 w-full resize-y rounded-2xl border border-(--border) bg-(--surface-raised) p-4 text-sm leading-7 text-(--foreground) outline-none transition focus:border-(--accent)"
-              placeholder="설명 정보를 입력해주세요"
+              placeholder="설명 정보를 입력해 주세요"
             />
           ) : (
             <p className="min-h-24 whitespace-pre-line rounded-2xl border border-(--border) bg-(--surface-raised) p-4 text-sm leading-7 text-(--muted-strong)">
@@ -315,6 +324,21 @@ export default function ProfilePage() {
           ) : null}
           {!postsQuery.isLoading && !postsQuery.isError
             ? myPosts.map((post) => <PostCard key={post.id} post={post} />)
+            : null}
+        </div>
+      );
+    }
+
+    if (activeTab === "bookmarks") {
+      return (
+        <div className="grid gap-4">
+          {bookmarksQuery.isLoading ? <p className="text-sm text-(--muted-strong)">내 북마크를 불러오는 중입니다.</p> : null}
+          {bookmarksQuery.isError ? <p className="text-sm text-(--danger)">내 북마크를 불러오지 못했습니다.</p> : null}
+          {!bookmarksQuery.isLoading && !bookmarksQuery.isError && myBookmarks.length === 0 ? (
+            <p className="text-sm text-(--muted-strong)">북마크한 게시글이 없습니다.</p>
+          ) : null}
+          {!bookmarksQuery.isLoading && !bookmarksQuery.isError
+            ? myBookmarks.map((post) => <PostCard key={post.id} post={post} />)
             : null}
         </div>
       );
@@ -357,264 +381,264 @@ export default function ProfilePage() {
   return (
     <RequireLogin>
       <AppShell showPageHeader={false}>
-      <div className="grid gap-6">
-        <section className="relative grid gap-6 rounded-[28px] border border-(--border) bg-(--surface) p-6 shadow-(--shadow) backdrop-blur-[18px] lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
-          <div className="absolute right-5 top-5 z-10">
-            <button
-              type="button"
-              onClick={() => setIsMenuOpen((current) => !current)}
-              aria-label="프로필 설정"
-              aria-expanded={isMenuOpen}
-              aria-haspopup="menu"
-              title="설정"
-              className="grid size-10 place-items-center rounded-full border border-(--border) bg-(--surface-raised) text-(--muted-strong) transition hover:-translate-y-px hover:border-(--accent) hover:text-(--foreground)"
-            >
-              <EllipsisIcon className="size-5" />
-            </button>
-
-            {isMenuOpen ? (
-              <div
-                role="menu"
-                className="absolute right-0 mt-2 grid min-w-36 overflow-hidden rounded-2xl border border-(--border) bg-(--surface) p-1 text-sm font-semibold shadow-(--shadow)"
+        <div className="grid gap-6">
+          <section className="relative grid gap-6 rounded-[28px] border border-(--border) bg-(--surface) p-6 shadow-(--shadow) backdrop-blur-[18px] lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
+            <div className="absolute right-5 top-5 z-10">
+              <button
+                type="button"
+                onClick={() => setIsMenuOpen((current) => !current)}
+                aria-label="프로필 설정"
+                aria-expanded={isMenuOpen}
+                aria-haspopup="menu"
+                title="설정"
+                className="grid size-10 place-items-center rounded-full border border-(--border) bg-(--surface-raised) text-(--muted-strong) transition hover:-translate-y-px hover:border-(--accent) hover:text-(--foreground)"
               >
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={startEditing}
-                  className="rounded-xl px-4 py-3 text-left transition hover:bg-(--surface-raised)"
+                <EllipsisIcon className="size-5" />
+              </button>
+
+              {isMenuOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-2 grid min-w-36 overflow-hidden rounded-2xl border border-(--border) bg-(--surface) p-1 text-sm font-semibold shadow-(--shadow)"
                 >
-                  수정
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={openImageModal}
-                  className="rounded-xl px-4 py-3 text-left transition hover:bg-(--surface-raised)"
-                >
-                  이미지 변경
-                </button>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="flex h-full flex-col items-center justify-center">
-            {visibleAvatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={visibleAvatarUrl}
-                alt={`${visibleNickname} 프로필 이미지`}
-                className="size-36 rounded-full border border-(--border) bg-(--surface-raised) object-cover shadow-(--shadow)"
-              />
-            ) : (
-              <div
-                aria-label="프로필 이미지"
-                className="grid size-36 place-items-center rounded-full border border-(--border) bg-(--accent-soft) text-5xl font-bold text-(--accent) shadow-(--shadow)"
-              >
-                {avatarInitial}
-              </div>
-            )}
-          </div>
-
-          <div className="grid gap-5 pr-12">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="min-w-0 space-y-2">
-                {isEditing ? (
-                  <input
-                    value={draftNickname}
-                    onChange={(event) => setDraftNickname(event.target.value)}
-                    className="min-h-12 w-full max-w-lg rounded-2xl border border-(--border) bg-(--surface-raised) px-4 text-3xl font-semibold text-(--foreground) outline-none transition focus:border-(--accent) md:text-4xl"
-                    placeholder="이름"
-                  />
-                ) : (
-                  <h1 className="break-words text-3xl font-semibold md:text-4xl">{ready ? visibleNickname : "프로필"}</h1>
-                )}
-              </div>
-
-              {!loggedIn && ready ? (
-                <Link href="/login" className={buttonClassName({ variant: "primary", size: "sm" })}>
-                  로그인
-                </Link>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={startEditing}
+                    className="rounded-xl px-4 py-3 text-left transition hover:bg-(--surface-raised)"
+                  >
+                    수정
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={openImageModal}
+                    className="rounded-xl px-4 py-3 text-left transition hover:bg-(--surface-raised)"
+                  >
+                    이미지 변경
+                  </button>
+                </div>
               ) : null}
+            </div>
 
-              {isEditing ? (
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={cancelEditing} className={buttonClassName({ size: "sm" })}>
+            <div className="flex h-full flex-col items-center justify-center">
+              {visibleAvatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={visibleAvatarUrl}
+                  alt={`${visibleNickname} 프로필 이미지`}
+                  className="size-36 rounded-full border border-(--border) bg-(--surface-raised) object-cover shadow-(--shadow)"
+                />
+              ) : (
+                <div
+                  aria-label="프로필 이미지"
+                  className="grid size-36 place-items-center rounded-full border border-(--border) bg-(--accent-soft) text-5xl font-bold text-(--accent) shadow-(--shadow)"
+                >
+                  {avatarInitial}
+                </div>
+              )}
+            </div>
+
+            <div className="grid gap-5 pr-12">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 space-y-2">
+                  {isEditing ? (
+                    <input
+                      value={draftNickname}
+                      onChange={(event) => setDraftNickname(event.target.value)}
+                      className="min-h-12 w-full max-w-lg rounded-2xl border border-(--border) bg-(--surface-raised) px-4 text-3xl font-semibold text-(--foreground) outline-none transition focus:border-(--accent) md:text-4xl"
+                      placeholder="이름"
+                    />
+                  ) : (
+                    <h1 className="break-words text-3xl font-semibold md:text-4xl">{ready ? visibleNickname : "프로필"}</h1>
+                  )}
+                </div>
+
+                {!loggedIn && ready ? (
+                  <Link href="/login" className={buttonClassName({ variant: "primary", size: "sm" })}>
+                    로그인
+                  </Link>
+                ) : null}
+
+                {isEditing ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={cancelEditing} className={buttonClassName({ size: "sm" })}>
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveProfile}
+                      className={buttonClassName({ variant: "primary", size: "sm" })}
+                      disabled={savingProfile}
+                    >
+                      저장
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
+              {profileQuery.isError ? (
+                <p className="text-sm font-semibold text-(--danger)">프로필을 불러오지 못했습니다.</p>
+              ) : null}
+              <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="rounded-2xl border border-(--border) bg-(--surface-raised) p-4">
+                  <dt className="text-xs font-bold text-(--muted)">이름</dt>
+                  <dd className="mt-2 break-words text-sm font-semibold">{visibleNickname}</dd>
+                </div>
+                <div className="rounded-2xl border border-(--border) bg-(--surface-raised) p-4">
+                  <dt className="text-xs font-bold text-(--muted)">이메일</dt>
+                  <dd className="mt-2 break-words text-sm font-semibold">{email}</dd>
+                </div>
+                <div className="rounded-2xl border border-(--border) bg-(--surface-raised) p-4">
+                  <dt className="text-xs font-bold text-(--muted)">가입일</dt>
+                  <dd className="mt-2 break-words text-sm font-semibold">{formatDate(user?.createdAt)}</dd>
+                </div>
+              </dl>
+
+              <div className="grid gap-2">
+                <p className="text-sm font-semibold">전공/관심 분야</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {visibleMajors.length ? (
+                    visibleMajors.map((major) => (
+                      <span
+                        key={major}
+                        className="inline-flex items-center gap-2 rounded-full border border-(--border) bg-(--accent-soft) px-3 py-1.5 text-xs font-semibold text-(--accent)"
+                      >
+                        {isEditing ? (
+                          <button
+                            type="button"
+                            onClick={() => removeMajor(major)}
+                            aria-label={`${major} 제거`}
+                            className="-ml-1 grid size-6 place-items-center rounded-full text-(--danger) transition hover:bg-(--surface)"
+                          >
+                            <TrashIcon className="size-3.5" />
+                          </button>
+                        ) : null}
+                        {major}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-(--muted-strong)">전공 정보 없음</span>
+                  )}
+
+                  {isEditing ? (
+                    <form onSubmit={addMajor} className="flex min-w-[220px] items-center gap-2">
+                      <input
+                        value={newMajor}
+                        onChange={(event) => setNewMajor(event.target.value)}
+                        className="h-10 min-w-0 flex-1 rounded-full border border-(--border) bg-(--surface-raised) px-3 text-sm text-(--foreground) outline-none transition focus:border-(--accent)"
+                        placeholder="전공 또는 관심 분야 추가"
+                      />
+                      <button
+                        type="submit"
+                        aria-label="전공 또는 관심 분야 추가"
+                        className="grid size-10 place-items-center rounded-full border border-(--accent) bg-(--accent) text-(--primary-foreground) transition hover:-translate-y-px hover:brightness-110"
+                      >
+                        <PlusIcon className="size-4" />
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[28px] border border-(--border) bg-(--surface) p-3 shadow-(--shadow) backdrop-blur-[18px]">
+            <div className="grid grid-cols-4 gap-2">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={[
+                    "min-h-12 rounded-[18px] px-3 text-sm font-semibold transition duration-150",
+                    activeTab === tab.id
+                      ? "border border-(--accent) bg-(--accent-soft) text-(--foreground)"
+                      : "border border-transparent text-(--muted-strong) hover:bg-(--surface-raised) hover:text-(--foreground)",
+                  ].join(" ")}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 border-t border-(--border) px-3 py-5">{renderTabContent()}</div>
+          </section>
+        </div>
+
+        {isImageModalOpen ? (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-image-modal-title"
+            className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 backdrop-blur-[2px]"
+          >
+            <section className="w-full max-w-[520px] rounded-[28px] border border-(--border) bg-(--surface) p-6 shadow-(--shadow)">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 id="profile-image-modal-title" className="text-xl font-semibold">
+                    프로필 이미지 변경
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeImageModal}
+                  aria-label="프로필 이미지 변경 창 닫기"
+                  className="grid size-10 place-items-center rounded-full border border-(--border) bg-(--surface-raised) text-(--muted-strong) transition hover:border-(--accent) hover:text-(--foreground)"
+                >
+                  <span aria-hidden="true">x</span>
+                </button>
+              </div>
+
+              <div className="mt-6 grid gap-5">
+                <div className="grid justify-items-center gap-3">
+                  <p className="text-sm font-semibold">프로필 이미지 미리보기</p>
+                  <div className="grid size-44 place-items-center overflow-hidden rounded-full border border-(--border) bg-(--accent-soft) text-5xl font-bold text-(--accent) shadow-(--shadow)">
+                    {imageDraftUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={imageDraftUrl} alt="프로필 이미지 미리보기" className="size-full object-cover" />
+                    ) : (
+                      modalAvatarInitial
+                    )}
+                  </div>
+                </div>
+
+                <label
+                  onDragEnter={handleImageDragOver}
+                  onDragOver={handleImageDragOver}
+                  onDragLeave={handleImageDragLeave}
+                  onDrop={handleImageDrop}
+                  className={[
+                    "grid cursor-pointer gap-2 rounded-2xl border border-dashed p-5 text-center transition",
+                    isImageDragActive
+                      ? "border-(--accent) bg-(--accent-soft)"
+                      : "border-(--border) bg-(--surface-raised) hover:border-(--accent) hover:bg-(--surface-soft)",
+                  ].join(" ")}
+                >
+                  <input type="file" accept="image/*" className="sr-only" onChange={handleImageFileChange} />
+                  <span className="font-semibold">이미지 파일 선택 또는 드래그</span>
+                  <span className="text-sm leading-6 text-(--muted-strong)">JPG, PNG, WebP 파일을 선택할 수 있습니다.</span>
+                </label>
+
+                {imageFileName ? <p className="text-sm text-(--muted-strong)">선택한 파일: {imageFileName}</p> : null}
+                {imageError ? <p className="text-sm font-semibold text-(--danger)">{imageError}</p> : null}
+
+                <div className="flex flex-wrap justify-end gap-2">
+                  <button type="button" onClick={closeImageModal} className={buttonClassName({ size: "sm" })}>
                     취소
                   </button>
                   <button
                     type="button"
-                    onClick={saveProfile}
+                    onClick={saveProfileImage}
                     className={buttonClassName({ variant: "primary", size: "sm" })}
-                    disabled={savingProfile}
+                    disabled={!imageDraftUrl || savingImage}
                   >
-                    수정
+                    저장
                   </button>
                 </div>
-              ) : null}
-            </div>
-
-            {profileQuery.isError ? (
-              <p className="text-sm font-semibold text-(--danger)">프로필을 불러오지 못했습니다.</p>
-            ) : null}
-            <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-2xl border border-(--border) bg-(--surface-raised) p-4">
-                <dt className="text-xs font-bold text-(--muted)">이름</dt>
-                <dd className="mt-2 break-words text-sm font-semibold">{visibleNickname}</dd>
               </div>
-              <div className="rounded-2xl border border-(--border) bg-(--surface-raised) p-4">
-                <dt className="text-xs font-bold text-(--muted)">이메일</dt>
-                <dd className="mt-2 break-words text-sm font-semibold">{email}</dd>
-              </div>
-              <div className="rounded-2xl border border-(--border) bg-(--surface-raised) p-4">
-                <dt className="text-xs font-bold text-(--muted)">가입일</dt>
-                <dd className="mt-2 break-words text-sm font-semibold">{formatDate(user?.createdAt)}</dd>
-              </div>
-            </dl>
-
-            <div className="grid gap-2">
-              <p className="text-sm font-semibold">전공/관심 분야</p>
-              <div className="flex flex-wrap items-center gap-2">
-                {visibleMajors.length ? (
-                  visibleMajors.map((major) => (
-                    <span
-                      key={major}
-                      className="inline-flex items-center gap-2 rounded-full border border-(--border) bg-(--accent-soft) px-3 py-1.5 text-xs font-semibold text-(--accent)"
-                    >
-                      {isEditing ? (
-                        <button
-                          type="button"
-                          onClick={() => removeMajor(major)}
-                          aria-label={`${major} 삭제`}
-                          className="-ml-1 grid size-6 place-items-center rounded-full text-(--danger) transition hover:bg-(--surface)"
-                        >
-                          <TrashIcon className="size-3.5" />
-                        </button>
-                      ) : null}
-                      {major}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-sm text-(--muted-strong)">전공 정보 없음</span>
-                )}
-
-                {isEditing ? (
-                  <form onSubmit={addMajor} className="flex min-w-[220px] items-center gap-2">
-                    <input
-                      value={newMajor}
-                      onChange={(event) => setNewMajor(event.target.value)}
-                      className="h-10 min-w-0 flex-1 rounded-full border border-(--border) bg-(--surface-raised) px-3 text-sm text-(--foreground) outline-none transition focus:border-(--accent)"
-                      placeholder="전공 또는 관심 분야 추가"
-                    />
-                    <button
-                      type="submit"
-                      aria-label="전공 또는 관심 분야 추가"
-                      className="grid size-10 place-items-center rounded-full border border-(--accent) bg-(--accent) text-(--primary-foreground) transition hover:-translate-y-px hover:brightness-110"
-                    >
-                      <PlusIcon className="size-4" />
-                    </button>
-                  </form>
-                ) : null}
-              </div>
-            </div>
+            </section>
           </div>
-        </section>
-
-        <section className="rounded-[28px] border border-(--border) bg-(--surface) p-3 shadow-(--shadow) backdrop-blur-[18px]">
-          <div className="grid grid-cols-3 gap-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={[
-                  "min-h-12 rounded-[18px] px-3 text-sm font-semibold transition duration-150",
-                  activeTab === tab.id
-                    ? "border border-(--accent) bg-(--accent-soft) text-(--foreground)"
-                    : "border border-transparent text-(--muted-strong) hover:bg-(--surface-raised) hover:text-(--foreground)",
-                ].join(" ")}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 border-t border-(--border) px-3 py-5">{renderTabContent()}</div>
-        </section>
-      </div>
-
-      {isImageModalOpen ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="profile-image-modal-title"
-          className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 backdrop-blur-[2px]"
-        >
-          <section className="w-full max-w-[520px] rounded-[28px] border border-(--border) bg-(--surface) p-6 shadow-(--shadow)">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 id="profile-image-modal-title" className="text-xl font-semibold">
-                  프로필 이미지 변경
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={closeImageModal}
-                aria-label="프로필 이미지 변경 닫기"
-                className="grid size-10 place-items-center rounded-full border border-(--border) bg-(--surface-raised) text-(--muted-strong) transition hover:border-(--accent) hover:text-(--foreground)"
-              >
-                <span aria-hidden="true">x</span>
-              </button>
-            </div>
-
-            <div className="mt-6 grid gap-5">
-              <div className="grid justify-items-center gap-3">
-                <p className="text-sm font-semibold">프로필 이미지 미리보기</p>
-                <div className="grid size-44 place-items-center overflow-hidden rounded-full border border-(--border) bg-(--accent-soft) text-5xl font-bold text-(--accent) shadow-(--shadow)">
-                  {imageDraftUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={imageDraftUrl} alt="프로필 이미지 미리보기" className="size-full object-cover" />
-                  ) : (
-                    modalAvatarInitial
-                  )}
-                </div>
-              </div>
-
-              <label
-                onDragEnter={handleImageDragOver}
-                onDragOver={handleImageDragOver}
-                onDragLeave={handleImageDragLeave}
-                onDrop={handleImageDrop}
-                className={[
-                  "grid cursor-pointer gap-2 rounded-2xl border border-dashed p-5 text-center transition",
-                  isImageDragActive
-                    ? "border-(--accent) bg-(--accent-soft)"
-                    : "border-(--border) bg-(--surface-raised) hover:border-(--accent) hover:bg-(--surface-soft)",
-                ].join(" ")}
-              >
-                <input type="file" accept="image/*" className="sr-only" onChange={handleImageFileChange} />
-                <span className="font-semibold">이미지 파일 선택 또는 드롭</span>
-                <span className="text-sm leading-6 text-(--muted-strong)">JPG, PNG, WebP 파일을 선택할 수 있습니다.</span>
-              </label>
-
-              {imageFileName ? <p className="text-sm text-(--muted-strong)">선택한 파일: {imageFileName}</p> : null}
-              {imageError ? <p className="text-sm font-semibold text-(--danger)">{imageError}</p> : null}
-
-              <div className="flex flex-wrap justify-end gap-2">
-                <button type="button" onClick={closeImageModal} className={buttonClassName({ size: "sm" })}>
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={saveProfileImage}
-                  className={buttonClassName({ variant: "primary", size: "sm" })}
-                  disabled={!imageDraftUrl || savingImage}
-                >
-                  저장
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      ) : null}
+        ) : null}
       </AppShell>
     </RequireLogin>
   );

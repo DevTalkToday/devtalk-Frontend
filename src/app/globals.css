@@ -8,6 +8,7 @@ html[data-theme="dark"] {
   --muted-strong: rgba(225, 244, 221, 0.78);
   --surface: rgba(8, 18, 10, 0.8);
   --surface-raised: rgba(14, 28, 16, 0.92);
+  --surface-solid: #0e1c10;
   --surface-soft: rgba(15, 33, 18, 0.55);
   --header-backdrop: rgba(20, 94, 42, 0.36);
   --accent: #6afc6a;
@@ -38,6 +39,7 @@ html[data-theme="light"] {
   --muted-strong: rgba(8, 19, 38, 0.72);
   --surface: rgba(255, 255, 255, 0.84);
   --surface-raised: rgba(255, 255, 255, 0.94);
+  --surface-solid: #ffffff;
   --surface-soft: rgba(226, 236, 255, 0.8);
   --header-backdrop: rgba(37, 99, 255, 0.22);
   --accent: #2563ff;

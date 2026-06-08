@@ -1,10 +1,9 @@
 import {
-  BUG_PRIORITIES,
   BUG_STATUSES,
   POST_CATEGORIES,
-  type BugPriority,
-  type BugStatus,
   type BugMeta,
+  type BugPayload,
+  type BugStatus,
   type CommentAcceptPayload,
   type CommentPayload,
   type PostCategory,
@@ -12,6 +11,7 @@ import {
   type PostDetail,
   type PostPayload,
   type QuestionMeta,
+  type QuestionPayload,
 } from "@/lib/posts/types";
 import { normalizeMajorValues } from "@/lib/majors/normalize";
 
@@ -50,34 +50,26 @@ const isCategory = (value: string): value is PostCategory =>
 const isBugStatus = (value: string): value is BugStatus =>
   BUG_STATUSES.includes(value as BugStatus);
 
-const isBugPriority = (value: string): value is BugPriority =>
-  BUG_PRIORITIES.includes(value as BugPriority);
-
-const buildQuestionMeta = (body: UnknownRecord, existing?: QuestionMeta): QuestionMeta => {
+const buildQuestionMeta = (body: UnknownRecord, existing?: QuestionMeta): QuestionPayload => {
   const question = asRecord(body.question);
 
   return {
-    solved: Boolean(question.solved),
-    environment: clampText(question.environment, 180),
-    tried: clampText(question.tried, 180),
+    expected: clampText(question.expected, 240),
+    actual: clampText(question.actual, 240),
+    reproductionSteps: cleanLines(question.reproductionSteps),
     acceptedCommentId: existing?.acceptedCommentId ?? null,
   };
 };
 
-const buildBugMeta = (body: UnknownRecord, existing?: BugMeta): BugMeta => {
+const buildBugMeta = (body: UnknownRecord, existing?: BugMeta): BugPayload => {
   const bug = asRecord(body.bug);
   const rawStatus = trimText(bug.status).toLowerCase();
-  const rawPriority = trimText(bug.priority).toUpperCase();
 
   return {
     status: isBugStatus(rawStatus) ? rawStatus : existing?.status ?? "open",
-    priority: isBugPriority(rawPriority) ? rawPriority : existing?.priority ?? "P2",
-    assignee: clampText(bug.assignee, 80),
-    environment: clampText(bug.environment, 180),
     expected: clampText(bug.expected, 240),
     actual: clampText(bug.actual, 240),
     reproductionSteps: cleanLines(bug.reproductionSteps),
-    labels: cleanArray(bug.labels, 6),
     watchers: existing?.watchers ?? 0,
     acceptedCommentId: existing?.acceptedCommentId ?? null,
   };

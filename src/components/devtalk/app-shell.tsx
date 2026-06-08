@@ -4,10 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { buttonClassName } from "@/components/ui";
-import { FetchGetAuth, FetchPostAuth } from "@/lib/api/fetch";
+import { FetchGetAuthSilent, FetchPostAuth } from "@/lib/api/fetch";
 import { clearAuthSession, getAccessToken, getAuthUser, issueFreshGuestToken, useAuthStatus } from "@/lib/auth/session";
 
 type AppShellProps = {
@@ -31,22 +31,133 @@ type ProfileMeResponse = {
   user: ShellAuthUser | null;
 };
 
-const primaryNavItems = [
+type FriendReceivedCountResponse = {
+  receivedCount: number;
+};
+
+type MessageUnreadCountResponse = {
+  unreadCount: number;
+};
+
+type NotificationUnreadCountResponse = {
+  unreadCount: number;
+};
+
+type FriendSummaryPollResponse = {
+  received?: unknown[];
+};
+
+type ConversationPollResponse = {
+  unreadCount?: number;
+};
+
+type NotificationPollResponse = {
+  unread?: boolean;
+};
+
+type NavIndicatorState = {
+  friends: boolean;
+  messages: boolean;
+  notifications: boolean;
+};
+
+type NavMenuChild = {
+  href: string;
+  label: string;
+};
+
+type PrimaryNavItem = {
+  href: string;
+  label: string;
+  icon: string;
+  children?: NavMenuChild[];
+};
+
+const primaryNavItems: PrimaryNavItem[] = [
   { href: "/", label: "홈", icon: "/home.svg" },
-  { href: "/posts", label: "목록", icon: "/list.svg" },
+  {
+    href: "/posts",
+    label: "목록",
+    icon: "/list.svg",
+    children: [
+      { href: "/posts", label: "게시판" },
+      { href: "/recruit", label: "인원 모집" },
+      { href: "/ai-portfolio", label: "AI 포폴 생성" },
+    ],
+  },
   { href: "/friends", label: "친구", icon: "/friend.svg" },
   { href: "/messages", label: "메시지", icon: "/chat.svg" },
   { href: "/notifications", label: "알림", icon: "/bell.svg" },
 ];
+
+const emptyNavIndicatorState: NavIndicatorState = {
+  friends: false,
+  messages: false,
+  notifications: false,
+};
+
+const NAV_INDICATOR_POLL_INTERVAL_MS = 15_000;
 
 const isActivePath = (pathname: string, href: string) => {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
 };
 
+const isNavItemActive = (pathname: string, item: PrimaryNavItem) =>
+  isActivePath(pathname, item.href) || item.children?.some((child) => isActivePath(pathname, child.href)) === true;
+
 const asShellAuthUser = (value: unknown): ShellAuthUser | null => {
   if (!value || typeof value !== "object") return null;
   return value as ShellAuthUser;
+};
+
+const hasNavIndicator = (href: string, indicatorState: NavIndicatorState) => {
+  if (href === "/friends") return indicatorState.friends;
+  if (href === "/messages") return indicatorState.messages;
+  if (href === "/notifications") return indicatorState.notifications;
+  return false;
+};
+
+const loadFriendIndicator = async () => {
+  try {
+    const response = (await FetchGetAuthSilent("/friends/received-count")) as FriendReceivedCountResponse;
+    return (response.receivedCount ?? 0) > 0;
+  } catch {
+    try {
+      const summary = (await FetchGetAuthSilent("/friends")) as FriendSummaryPollResponse;
+      return Array.isArray(summary.received) && summary.received.length > 0;
+    } catch {
+      return false;
+    }
+  }
+};
+
+const loadMessageIndicator = async () => {
+  try {
+    const response = (await FetchGetAuthSilent("/messages/unread-count")) as MessageUnreadCountResponse;
+    return (response.unreadCount ?? 0) > 0;
+  } catch {
+    try {
+      const conversations = (await FetchGetAuthSilent("/messages/conversations")) as ConversationPollResponse[];
+      return conversations.some((conversation) => (conversation.unreadCount ?? 0) > 0);
+    } catch {
+      return false;
+    }
+  }
+};
+
+const loadNotificationIndicator = async () => {
+  try {
+    const response = (await FetchGetAuthSilent("/notifications/unread-count")) as NotificationUnreadCountResponse;
+    return (response.unreadCount ?? 0) > 0;
+  } catch {
+    try {
+      const notifications = (await FetchGetAuthSilent("/notifications?limit=100")) as NotificationPollResponse[];
+      return notifications.some((notification) => notification.unread === true);
+    } catch {
+      return false;
+    }
+  }
 };
 
 export function AppShell({
@@ -62,6 +173,9 @@ export function AppShell({
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [shellUser, setShellUser] = useState<ShellAuthUser | null>(null);
+  const [navIndicatorState, setNavIndicatorState] = useState<NavIndicatorState>(emptyNavIndicatorState);
+  const [openMenuHref, setOpenMenuHref] = useState<string | null>(null);
+  const openMenuRef = useRef<HTMLDivElement | null>(null);
   const { ready: authReady, loggedIn } = useAuthStatus();
   const authUser = shellUser ?? (authReady && loggedIn ? asShellAuthUser(getAuthUser()) : null);
   const profileName = authUser?.nickname?.trim() || authUser?.username?.trim() || "U";
@@ -84,14 +198,14 @@ export function AppShell({
       setShellUser(storedUser);
 
       try {
-        const profile = (await FetchGetAuth("/profile/me")) as ProfileMeResponse;
+        const profile = (await FetchGetAuthSilent("/profile/me")) as ProfileMeResponse;
         if (alive && getAuthUser() && getAccessToken()) setShellUser(asShellAuthUser(profile.user));
       } catch {
         if (alive) setShellUser(asShellAuthUser(getAuthUser()));
       }
     };
 
-    syncProfile();
+    void syncProfile();
     window.addEventListener("storage", syncProfile);
     window.addEventListener("devtalk-auth-changed", syncProfile);
 
@@ -99,6 +213,90 @@ export function AppShell({
       alive = false;
       window.removeEventListener("storage", syncProfile);
       window.removeEventListener("devtalk-auth-changed", syncProfile);
+    };
+  }, [authReady, loggedIn]);
+
+  useEffect(() => {
+    setOpenMenuHref(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!openMenuHref) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!openMenuRef.current?.contains(event.target as Node)) {
+        setOpenMenuHref(null);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenMenuHref(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openMenuHref]);
+
+  useEffect(() => {
+    let alive = true;
+
+    const loadNavIndicators = async () => {
+      if (!authReady || !loggedIn || !getAccessToken()) {
+        if (alive) setNavIndicatorState(emptyNavIndicatorState);
+        return;
+      }
+
+      const [friendResult, messageResult, notificationResult] = await Promise.allSettled([
+        loadFriendIndicator(),
+        loadMessageIndicator(),
+        loadNotificationIndicator(),
+      ]);
+
+      if (!alive) return;
+
+      setNavIndicatorState({
+        friends: friendResult.status === "fulfilled" && friendResult.value,
+        messages: messageResult.status === "fulfilled" && messageResult.value,
+        notifications: notificationResult.status === "fulfilled" && notificationResult.value,
+      });
+    };
+
+    const handleFocus = () => {
+      void loadNavIndicators();
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) void loadNavIndicators();
+    };
+
+    const handleAuthChange = () => {
+      void loadNavIndicators();
+    };
+
+    void loadNavIndicators();
+    const intervalId = window.setInterval(() => {
+      if (!document.hidden) void loadNavIndicators();
+    }, NAV_INDICATOR_POLL_INTERVAL_MS);
+
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("storage", handleAuthChange);
+    window.addEventListener("devtalk-auth-changed", handleAuthChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      alive = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("storage", handleAuthChange);
+      window.removeEventListener("devtalk-auth-changed", handleAuthChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [authReady, loggedIn]);
 
@@ -142,82 +340,142 @@ export function AppShell({
               compactRadius ? "rounded-[14px]" : "rounded-[28px]",
             ].join(" ")}
           >
-          <div className="grid gap-3 xl:grid-cols-[auto_minmax(260px,1fr)_auto] xl:items-center">
-            <nav aria-label="주요 메뉴" className="flex flex-wrap items-center gap-2">
-              {primaryNavItems.map((item) => {
-                const active = isActivePath(pathname, item.href);
+            <div className="grid gap-3 xl:grid-cols-[auto_minmax(260px,1fr)_auto] xl:items-center">
+              <nav aria-label="주요 메뉴" className="flex flex-wrap items-center gap-2">
+                {primaryNavItems.map((item) => {
+                  const active = isNavItemActive(pathname, item);
+                  const isMenuOpen = openMenuHref === item.href;
+                  const commonClassName = [
+                    "relative inline-flex h-11 min-w-11 appearance-none items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold whitespace-nowrap transition duration-150 cursor-pointer",
+                    active
+                      ? "border-(--accent) bg-(--accent-soft) text-(--foreground)"
+                      : "border-(--border) bg-(--surface-raised) text-(--muted-strong) hover:-translate-y-px hover:border-(--accent) hover:text-(--foreground)",
+                  ].join(" ");
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    title={item.label}
-                    aria-label={item.label}
-                    className={[
-                      "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold transition duration-150",
-                      active
-                        ? "border-(--accent) bg-(--accent-soft) text-(--foreground)"
-                        : "border-(--border) bg-(--surface-raised) text-(--muted-strong) hover:-translate-y-px hover:border-(--accent) hover:text-(--foreground)",
-                    ].join(" ")}
-                  >
-                    <Image src={item.icon} alt="" width={16} height={16} className="theme-icon size-4" />
-                    <span className="hidden sm:inline">{item.label}</span>
-                  </Link>
-                );
-              })}
+                  if (item.children?.length) {
+                    return (
+                      <div key={item.href} ref={isMenuOpen ? openMenuRef : null} className="relative">
+                        <Link
+                          href={item.href}
+                          role="button"
+                          title={item.label}
+                          aria-label={item.label}
+                          aria-haspopup="menu"
+                          aria-expanded={isMenuOpen}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            setOpenMenuHref((current) => (current === item.href ? null : item.href));
+                          }}
+                          className={commonClassName}
+                        >
+                          <Image src={item.icon} alt="" width={16} height={16} className="theme-icon size-4" />
+                          <span className="hidden sm:inline">{item.label}</span>
+                        </Link>
 
-              <Link
-                href={profileHref}
-                title="프로필"
-                aria-label="프로필"
-                className={[
-                  "inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-(--border) bg-(--surface-raised) text-sm font-bold text-(--foreground) transition duration-150 hover:-translate-y-px hover:border-(--accent)",
-                  isActivePath(pathname, "/profile") ? "border-(--accent) bg-(--accent-soft)" : "",
-                ].join(" ")}
-              >
-                {profileAvatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={profileAvatarUrl} alt="" className="size-7 rounded-full object-cover" />
-                ) : (
-                  <span className="grid size-7 place-items-center rounded-full bg-(--accent) text-xs text-(--primary-foreground)">
-                    {profileInitial}
-                  </span>
-                )}
-              </Link>
-            </nav>
+                        {isMenuOpen ? (
+                          <div
+                            role="menu"
+                            aria-label={`${item.label} 메뉴`}
+                            className="absolute left-0 top-full z-30 mt-2 grid min-w-[13rem] gap-1 rounded-[22px] border border-(--border) bg-[var(--surface-solid)] p-2 shadow-(--shadow)"
+                          >
+                            {item.children.map((child) => {
+                              const childActive = isActivePath(pathname, child.href);
 
-            <form onSubmit={submitSearch} className="relative">
-              <Image
-                src="/search.svg"
-                alt=""
-                width={16}
-                height={16}
-                className="theme-icon pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 opacity-70"
-              />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="게시글 검색"
-                aria-label="게시글 검색"
-                className="h-12 w-full rounded-full border border-(--border) bg-(--surface-raised) px-11 text-sm text-(--foreground) outline-none transition focus:border-(--accent) focus:bg-(--surface-soft)"
-              />
-            </form>
+                              return (
+                                <Link
+                                  key={child.href}
+                                  href={child.href}
+                                  role="menuitem"
+                                  onClick={() => setOpenMenuHref(null)}
+                                  className={[
+                                    "rounded-[16px] px-4 py-3 text-sm font-semibold transition",
+                                    childActive
+                                      ? "border border-(--accent) bg-(--accent-soft) text-(--foreground)"
+                                      : "border border-transparent text-(--muted-strong) hover:bg-(--surface-raised) hover:text-(--foreground)",
+                                  ].join(" ")}
+                                >
+                                  {child.label}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  }
 
-            <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
-              <ThemeToggle />
-              <Link
-                href="/settings"
-                title="설정"
-                aria-label="설정"
-                className="inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-(--border) bg-(--surface-raised) transition duration-150 hover:-translate-y-px hover:border-(--accent)"
-              >
-                <Image src="/config.svg" alt="" width={16} height={16} className="theme-icon size-4" />
-              </Link>
-              <button type="button" onClick={handleAuthButton} className={buttonClassName({ size: "sm" })}>
-                {authReady ? (loggedIn ? "로그아웃" : "로그인") : "로그인"}
-              </button>
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      title={item.label}
+                      aria-label={item.label}
+                      className={commonClassName}
+                    >
+                      {hasNavIndicator(item.href, navIndicatorState) ? (
+                        <span
+                          aria-hidden="true"
+                          className="absolute right-2 top-2 size-2.5 rounded-full border border-(--surface) bg-(--accent)"
+                        />
+                      ) : null}
+                      <Image src={item.icon} alt="" width={16} height={16} className="theme-icon size-4" />
+                      <span className="hidden sm:inline">{item.label}</span>
+                    </Link>
+                  );
+                })}
+
+                <Link
+                  href={profileHref}
+                  title="프로필"
+                  aria-label="프로필"
+                  className={[
+                    "inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-(--border) bg-(--surface-raised) text-sm font-bold text-(--foreground) transition duration-150 hover:-translate-y-px hover:border-(--accent)",
+                    isActivePath(pathname, "/profile") ? "border-(--accent) bg-(--accent-soft)" : "",
+                  ].join(" ")}
+                >
+                  {profileAvatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={profileAvatarUrl} alt="" className="size-7 rounded-full object-cover" />
+                  ) : (
+                    <span className="grid size-7 place-items-center rounded-full bg-(--accent) text-xs text-(--primary-foreground)">
+                      {profileInitial}
+                    </span>
+                  )}
+                </Link>
+              </nav>
+
+              <form onSubmit={submitSearch} className="relative">
+                <Image
+                  src="/search.svg"
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="theme-icon pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 opacity-70"
+                />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="게시글 검색"
+                  aria-label="게시글 검색"
+                  className="h-12 w-full rounded-full border border-(--border) bg-(--surface-raised) px-11 text-sm text-(--foreground) outline-none transition focus:border-(--accent) focus:bg-(--surface-soft)"
+                />
+              </form>
+
+              <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
+                <ThemeToggle />
+                <Link
+                  href="/settings"
+                  title="설정"
+                  aria-label="설정"
+                  className="inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-(--border) bg-(--surface-raised) transition duration-150 hover:-translate-y-px hover:border-(--accent)"
+                >
+                  <Image src="/config.svg" alt="" width={16} height={16} className="theme-icon size-4" />
+                </Link>
+                <button type="button" onClick={handleAuthButton} className={buttonClassName({ size: "sm" })}>
+                  {authReady ? (loggedIn ? "로그아웃" : "로그인") : "로그인"}
+                </button>
+              </div>
             </div>
-          </div>
           </header>
         </div>
 

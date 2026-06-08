@@ -80,6 +80,7 @@ type RequestOptions = {
   data?: unknown;
   auth?: AuthMode;
   noStore?: boolean;
+  suppressErrorToast?: boolean;
 };
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "");
@@ -114,6 +115,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   NOT_FOUND: "대상을 찾을 수 없습니다.",
   COMMENT_NOT_FOUND: "댓글을 찾을 수 없습니다.",
   "Email already exists": "이미 사용 중인 이메일입니다.",
+  "Email verification is required": "이메일 인증을 먼저 완료해주세요.",
+  "Email verification code is invalid": "인증번호가 올바르지 않습니다.",
+  "Email verification code expired": "인증번호가 만료되었습니다. 다시 요청해주세요.",
   "Login is required": "로그인이 필요합니다.",
   "Login session expired": "로그인 세션이 만료되었습니다. 다시 로그인해주세요.",
   "Invalid username or password": "아이디 또는 비밀번호를 확인해주세요.",
@@ -225,6 +229,9 @@ const readPayloadMessage = (payload: unknown) => {
 const getFriendlyErrorMessage = (status: number, payload: unknown) => {
   const code = readPayloadMessage(payload);
   if (code && ERROR_MESSAGES[code]) return ERROR_MESSAGES[code];
+  if (code === "Failed to send verification email") {
+    return "Verification email could not be sent. Check SMTP settings and try again.";
+  }
   if (code) {
     const validationMessage = translateValidationMessage(code);
     if (validationMessage) return validationMessage;
@@ -245,13 +252,15 @@ const resolveAccessToken = (auth: AuthMode | undefined) => {
   return null;
 };
 
-const request = async ({ method, path, data, auth, noStore }: RequestOptions) => {
+const request = async ({ method, path, data, auth, noStore, suppressErrorToast = false }: RequestOptions) => {
   let accessToken: string | null;
   try {
     accessToken = resolveAccessToken(auth);
   } catch {
     const message = getFriendlyErrorMessage(401, { message: "Login is required" });
-    showErrorToast(message);
+    if (!suppressErrorToast) {
+      showErrorToast(message);
+    }
     throw new Error(message);
   }
 
@@ -276,7 +285,9 @@ const request = async ({ method, path, data, auth, noStore }: RequestOptions) =>
     payload = await parsePayload(res);
   } catch {
     const message = "서버에 연결할 수 없습니다.";
-    showErrorToast(message);
+    if (!suppressErrorToast) {
+      showErrorToast(message);
+    }
     throw new Error(message);
   }
 
@@ -286,7 +297,9 @@ const request = async ({ method, path, data, auth, noStore }: RequestOptions) =>
     }
 
     const message = getFriendlyErrorMessage(res.status, payload);
-    showErrorToast(message);
+    if (!suppressErrorToast) {
+      showErrorToast(message);
+    }
     throw new Error(message);
   }
 
@@ -301,6 +314,8 @@ export const FetchPatch = (path: string, data?: unknown) => request({ method: "P
 export const FetchDelete = (path: string) => request({ method: "DELETE", path, auth: "none", noStore: true });
 
 export const FetchGetAuth = (path: string) => request({ method: "GET", path, auth: "required", noStore: true });
+export const FetchGetAuthSilent = (path: string) =>
+  request({ method: "GET", path, auth: "required", noStore: true, suppressErrorToast: true });
 export const FetchPostAuth = (path: string, data?: unknown) => request({ method: "POST", path, auth: "required", data, noStore: true });
 export const FetchPutAuth = (path: string, data?: unknown) => request({ method: "PUT", path, auth: "required", data, noStore: true });
 export const FetchPatchAuth = (path: string, data?: unknown) => request({ method: "PATCH", path, auth: "required", data, noStore: true });

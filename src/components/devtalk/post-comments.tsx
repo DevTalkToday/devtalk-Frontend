@@ -75,7 +75,7 @@ export function PostComments({
 
   const composerCopy = getComposerCopy(post.category);
   const orderedComments = useMemo(() => {
-    return [...post.comments].sort((left, right) => {
+    return [...(post.comments ?? [])].sort((left, right) => {
       const acceptedDiff = Number(Boolean(right.isAccepted)) - Number(Boolean(left.isAccepted));
       if (acceptedDiff !== 0) return acceptedDiff;
       return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
@@ -182,7 +182,7 @@ export function PostComments({
           <p className="text-sm text-(--muted-strong)">가이드라인에 맞춰 자유롭게 작성해 주세요.</p>
         </div>
         <span className="inline-flex w-fit items-center justify-center gap-1 rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1.5 text-xs font-semibold tracking-[0.02em] text-(--muted-strong)">
-          {post.comments.length} comments
+          {(post.comments ?? []).length} comments
         </span>
       </div>
 

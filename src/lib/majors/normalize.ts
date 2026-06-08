@@ -10,11 +10,20 @@ const KNOWN_MAJORS: MajorOption[] = [
   { code: "qa", label: "QA" },
 ];
 
+const findKnownMajor = (value: string) => {
+  const normalized = value.trim();
+  if (!normalized) return null;
+
+  return KNOWN_MAJORS.find((major) => major.code === normalized || major.label === normalized) ?? null;
+};
+
+export const isKnownMajorValue = (value: string) => findKnownMajor(value) !== null;
+
 export const getMajorLabel = (value: string) => {
   const normalized = value.trim();
   if (!normalized) return "";
 
-  const matched = KNOWN_MAJORS.find((major) => major.code === normalized || major.label === normalized);
+  const matched = findKnownMajor(normalized);
   return matched?.label ?? normalized;
 };
 

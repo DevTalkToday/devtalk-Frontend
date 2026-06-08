@@ -2,13 +2,11 @@ export const POST_CATEGORIES = ["qna", "bug", "talk"] as const;
 export const POST_SORT_OPTIONS = ["latest", "oldest", "popular", "views", "comments"] as const;
 export const POST_RESOLUTION_FILTERS = ["all", "resolved", "unresolved"] as const;
 export const BUG_STATUSES = ["open", "investigating", "fixed", "closed"] as const;
-export const BUG_PRIORITIES = ["P0", "P1", "P2", "P3"] as const;
 
 export type PostCategory = (typeof POST_CATEGORIES)[number];
 export type PostSortOption = (typeof POST_SORT_OPTIONS)[number];
 export type PostResolutionFilter = (typeof POST_RESOLUTION_FILTERS)[number];
 export type BugStatus = (typeof BUG_STATUSES)[number];
-export type BugPriority = (typeof BUG_PRIORITIES)[number];
 
 export type PostAuthor = {
   id: string;
@@ -32,22 +30,35 @@ export type PostComment = {
 
 export type QuestionMeta = {
   solved: boolean;
-  environment: string;
-  tried: string;
+  expected: string;
+  actual: string;
+  reproductionSteps: string[];
   acceptedCommentId: string | null;
 };
 
 export type BugMeta = {
   status: BugStatus;
-  priority: BugPriority;
-  assignee: string;
-  environment: string;
   expected: string;
   actual: string;
   reproductionSteps: string[];
-  labels: string[];
   watchers: number;
   acceptedCommentId: string | null;
+};
+
+export type QuestionPayload = {
+  expected: string;
+  actual: string;
+  reproductionSteps: string[];
+  acceptedCommentId?: string | null;
+};
+
+export type BugPayload = {
+  status: BugStatus;
+  expected: string;
+  actual: string;
+  reproductionSteps: string[];
+  watchers?: number;
+  acceptedCommentId?: string | null;
 };
 
 export type PostDetail = {
@@ -62,6 +73,7 @@ export type PostDetail = {
   commentCount: number;
   likeCount: number;
   bookmarkCount: number;
+  bookmarked: boolean;
   viewCount: number;
   tags: string[];
   majors: string[];
@@ -81,8 +93,8 @@ export type PostPayload = {
   category: PostCategory;
   tags: string[];
   majors: string[];
-  question?: QuestionMeta;
-  bug?: BugMeta;
+  question?: QuestionPayload;
+  bug?: BugPayload;
 };
 
 export type CommentPayload = {
@@ -96,7 +108,7 @@ export type CommentAcceptPayload = {
 export const CATEGORY_LABELS: Record<PostCategory, string> = {
   qna: "해결 기록",
   bug: "도움 필요",
-  talk: "나만 볼 게시글",
+  talk: "나만 보기 게시글",
 };
 
 export const SORT_LABELS: Record<PostSortOption, string> = {
@@ -117,5 +129,5 @@ export const BUG_STATUS_LABELS: Record<BugStatus, string> = {
   open: "미해결",
   investigating: "분석 중",
   fixed: "수정됨",
-  closed: "해결",
+  closed: "해결됨",
 };

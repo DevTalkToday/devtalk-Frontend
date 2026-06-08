@@ -6,14 +6,15 @@ import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/devtalk/app-shell";
-import { ArrowLeftIcon, CommentIcon, EyeIcon, HeartIcon, PenIcon, TrashIcon } from "@/components/devtalk/icons";
+import { ArrowLeftIcon, BookmarkIcon, CommentIcon, EyeIcon, HeartIcon, PenIcon, TrashIcon } from "@/components/devtalk/icons";
 import { MarkdownBody } from "@/components/devtalk/markdown-body";
 import { PostComments } from "@/components/devtalk/post-comments";
 import { ReportButton } from "@/components/devtalk/report-dialog";
 import { Button, buttonClassName } from "@/components/ui";
-import { FetchDeleteAuth, FetchGet } from "@/lib/api/fetch";
+import { FetchDeleteAuth, FetchGet, FetchPostAuth } from "@/lib/api/fetch";
 import { BUG_STATUS_LABELS, CATEGORY_LABELS, type PostDetail } from "@/lib/posts/types";
 import { getProfileHref } from "@/lib/profile/links";
+import { useAuthStatus } from "@/lib/auth/session";
 
 const formatDateTime = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
@@ -25,7 +26,7 @@ const formatDateTime = (value: string) =>
   }).format(new Date(value));
 
 const getHeadlineStatus = (post: PostDetail) => {
-  if (post.category === "qna") return post.question?.solved ? "해결됨" : "해결 대기";
+  if (post.category === "qna") return "해결됨";
   if (post.category === "bug") return post.bug ? BUG_STATUS_LABELS[post.bug.status] : "열림";
   return "기록 공유";
 };
@@ -36,15 +37,16 @@ const getAcceptedCommentId = (post: PostDetail) => {
   return null;
 };
 
-const metricClass =
-  "inline-flex items-center gap-1.5";
+const metricClass = "inline-flex items-center gap-1.5";
 
 export default function PostDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { id } = useParams<{ id: string }>();
   const trackedViewRef = useRef(false);
+  const { ready, loggedIn } = useAuthStatus();
   const [deleting, setDeleting] = useState(false);
+  const [bookmarking, setBookmarking] = useState(false);
 
   useEffect(() => {
     trackedViewRef.current = false;
@@ -90,12 +92,34 @@ export default function PostDetailPage() {
     }
   };
 
+  const toggleBookmark = async () => {
+    if (!post || bookmarking) return;
+    if (ready && !loggedIn) {
+      router.push("/login");
+      return;
+    }
+
+    setBookmarking(true);
+    try {
+      const nextPost = (
+        post.bookmarked
+          ? await FetchDeleteAuth(`/posts/${post.id}/bookmark`)
+          : await FetchPostAuth(`/posts/${post.id}/bookmark`)
+      ) as PostDetail;
+      syncPost(nextPost);
+      void queryClient.invalidateQueries({ queryKey: ["profile", "posts"] });
+      void queryClient.invalidateQueries({ queryKey: ["profile", "bookmarks"] });
+    } finally {
+      setBookmarking(false);
+    }
+  };
+
   return (
     <AppShell
-      title={post?.title ?? "기록 상세"}
+      title={post ? `${CATEGORY_LABELS[post.category]}` : "기록 상세"}
       description={
         post
-          ? `${CATEGORY_LABELS[post.category]} 상세입니다. 증상, 환경, 해결 과정, 댓글 히스토리를 한 화면에서 확인합니다.`
+          ? `${CATEGORY_LABELS[post.category]} 상세입니다. 가이드라인을 위반하는 내용이 있다면 신고 버튼을 눌러 알려주세요.`
           : "기록을 불러오는 중입니다."
       }
       actions={
@@ -106,6 +130,15 @@ export default function PostDetailPage() {
           </Link>
           {post ? (
             <>
+              <button
+                type="button"
+                onClick={toggleBookmark}
+                disabled={bookmarking}
+                className={buttonClassName({ variant: post.bookmarked ? "primary" : "surface" })}
+              >
+                <BookmarkIcon className="size-4" />
+                {post.bookmarked ? "북마크됨" : "북마크"}
+              </button>
               {post.canEdit ? (
                 <Link href={`/${post.id}/edit`} className={buttonClassName()}>
                   <PenIcon className="size-4" />
@@ -115,7 +148,7 @@ export default function PostDetailPage() {
               {post.canDelete ? (
                 <Button type="button" variant="danger" onClick={removePost} disabled={deleting}>
                   <TrashIcon className="size-4" />
-                  {deleting ? "삭제 중..." : "삭제"}
+                  {deleting ? "삭제 중.." : "삭제"}
                 </Button>
               ) : null}
               {!post.canEdit ? (
@@ -134,11 +167,15 @@ export default function PostDetailPage() {
       }
     >
       {isLoading ? (
-        <section className="rounded-4xl border border-(--border) bg-(--surface) p-6 text-sm text-(--muted-strong) shadow-(--shadow) backdrop-blur-[18px]">기록을 불러오는 중입니다...</section>
+        <section className="rounded-4xl border border-(--border) bg-(--surface) p-6 text-sm text-(--muted-strong) shadow-(--shadow) backdrop-blur-[18px]">
+          기록을 불러오는 중입니다...
+        </section>
       ) : null}
 
       {!isLoading && (isError || !post) ? (
-        <section className="rounded-4xl border border-(--border) bg-(--surface) p-6 text-sm text-(--danger) shadow-(--shadow) backdrop-blur-[18px]">기록을 불러오지 못했습니다.</section>
+        <section className="rounded-4xl border border-(--border) bg-(--surface) p-6 text-sm text-(--danger) shadow-(--shadow) backdrop-blur-[18px]">
+          기록을 불러오지 못했습니다.
+        </section>
       ) : null}
 
       {post ? (
@@ -146,11 +183,21 @@ export default function PostDetailPage() {
           <div className="space-y-6">
             <section className="space-y-5 rounded-4xl border border-(--border) bg-(--surface) p-6 shadow-(--shadow) backdrop-blur-[18px]">
               <div className="flex flex-wrap items-center gap-2">
-                <span className={["inline-flex w-fit items-center justify-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold tracking-[0.02em]", post.category === "qna" ? "border-(--border) bg-(--accent-soft) text-(--accent)" : post.category === "bug" ? "border-(--bug-border) bg-(--bug-bg) text-(--bug-text)" : "border-(--talk-border) bg-(--talk-bg) text-(--talk-text)"].join(" ")}>
+                <span
+                  className={[
+                    "inline-flex w-fit items-center justify-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold tracking-[0.02em]",
+                    post.category === "qna"
+                      ? "border-(--border) bg-(--accent-soft) text-(--accent)"
+                      : post.category === "bug"
+                        ? "border-(--bug-border) bg-(--bug-bg) text-(--bug-text)"
+                        : "border-(--talk-border) bg-(--talk-bg) text-(--talk-text)",
+                  ].join(" ")}
+                >
                   {CATEGORY_LABELS[post.category]}
                 </span>
-                <span className="inline-flex w-fit items-center justify-center gap-1 rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1.5 text-xs font-semibold tracking-[0.02em] text-(--muted-strong)">{getHeadlineStatus(post)}</span>
-                {post.category === "bug" && post.bug?.priority ? <span className="inline-flex w-fit items-center justify-center gap-1 rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1.5 text-xs font-semibold tracking-[0.02em] text-(--muted-strong)">{post.bug.priority}</span> : null}
+                <span className="inline-flex w-fit items-center justify-center gap-1 rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1.5 text-xs font-semibold tracking-[0.02em] text-(--muted-strong)">
+                  {getHeadlineStatus(post)}
+                </span>
               </div>
 
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
@@ -160,20 +207,34 @@ export default function PostDetailPage() {
                     <Link href={authorProfileHref} className="font-semibold text-(--foreground) transition hover:text-(--accent)">
                       {post.author.nickname}
                     </Link>{" "}
-                    · {post.author.role} · {formatDateTime(post.createdAt)}
+                    / {post.author.role} / {formatDateTime(post.createdAt)}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-sm text-(--muted-strong)">
-                  <span className={metricClass}><CommentIcon className="size-4" />{post.commentCount}</span>
-                  <span className={metricClass}><HeartIcon className="size-4" />{post.likeCount}</span>
-                  <span className={metricClass}><EyeIcon className="size-4" />{post.viewCount}</span>
+                  <span className={metricClass}>
+                    <CommentIcon className="size-4" />
+                    {post.commentCount}
+                  </span>
+                  <span className={metricClass}>
+                    <HeartIcon className="size-4" />
+                    {post.likeCount}
+                  </span>
+                  <span className={metricClass}>
+                    <EyeIcon className="size-4" />
+                    {post.viewCount}
+                  </span>
                 </div>
               </div>
 
-              {post.tags.length ? (
+              {(post.tags ?? []).length ? (
                 <div className="flex flex-wrap gap-2">
-                  {post.tags.map((tag) => (
-                    <span key={tag} className="inline-flex w-fit items-center justify-center gap-1 rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1.5 text-xs font-semibold tracking-[0.02em] text-(--muted-strong)">#{tag}</span>
+                  {(post.tags ?? []).map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex w-fit items-center justify-center gap-1 rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1.5 text-xs font-semibold tracking-[0.02em] text-(--muted-strong)"
+                    >
+                      #{tag}
+                    </span>
                   ))}
                 </div>
               ) : null}
@@ -205,10 +266,10 @@ export default function PostDetailPage() {
 
             {post.category === "qna" && post.question ? (
               <section className="space-y-4 rounded-4xl border border-(--border) bg-(--surface) p-6 shadow-(--shadow) backdrop-blur-[18px]">
-                <p className="text-lg font-semibold tracking-[-0.03em]">해결 메타</p>
+                <p className="text-lg font-semibold tracking-[-0.03em]">해결 기록 요약</p>
                 <div className="grid gap-3 text-sm">
-                  <InfoCard label="Environment" value={post.question.environment || "미입력"} help="문제가 발생한 환경" />
-                  <InfoCard label="Tried" value={post.question.tried || "미입력"} help="이미 시도한 해결 과정" />
+                  <InfoCard label="Expected" value={post.question.expected || "미입력"} help="기대 결과" />
+                  <InfoCard label="Actual" value={post.question.actual || "미입력"} help="실제 결과" />
                   <InfoCard
                     label="Accepted"
                     value={
@@ -220,26 +281,32 @@ export default function PostDetailPage() {
                         "아직 없음"
                       )
                     }
-                    help={acceptedComment ? "채택된 댓글이 해결 기록으로 연결되었습니다." : "댓글 메뉴에서 답변을 채택할 수 있습니다."}
+                    help={acceptedComment ? "채택된 댓글입니다." : "채택된 댓글이 없습니다."}
                   />
+                </div>
+                <div className="rounded-3xl border border-(--border) bg-(--surface-raised) p-5 shadow-(--shadow)">
+                  <p className="text-sm font-semibold">재현 절차</p>
+                  <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-7 text-(--muted-strong)">
+                    {(post.question.reproductionSteps ?? []).map((step) => (
+                      <li key={step}>{step}</li>
+                    ))}
+                  </ol>
                 </div>
               </section>
             ) : null}
 
             {post.category === "bug" && post.bug ? (
               <section className="space-y-4 rounded-4xl border border-(--border) bg-(--surface) p-6 shadow-(--shadow) backdrop-blur-[18px]">
-                <p className="text-lg font-semibold tracking-[-0.03em]">에러 요약</p>
+                <p className="text-lg font-semibold tracking-[-0.03em]">도움 필요 요약</p>
                 <div className="grid gap-3">
-                  <InfoCard label="Status" value={BUG_STATUS_LABELS[post.bug.status]} help={`Priority ${post.bug.priority}`} />
-                  <InfoCard label="Assignee" value={post.bug.assignee || "미배정"} help={`Watcher ${post.bug.watchers}`} />
-                  <InfoCard label="Environment" value={post.bug.environment || "미입력"} help="재현 당시 환경" />
+                  <InfoCard label="Status" value={BUG_STATUS_LABELS[post.bug.status]} help="현재 처리 상태" />
                   <InfoCard label="Expected" value={post.bug.expected || "미입력"} help="기대 동작" />
                   <InfoCard label="Actual" value={post.bug.actual || "미입력"} help="실제 결과" />
                 </div>
                 <div className="rounded-3xl border border-(--border) bg-(--surface-raised) p-5 shadow-(--shadow)">
                   <p className="text-sm font-semibold">재현 절차</p>
                   <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-7 text-(--muted-strong)">
-                    {post.bug.reproductionSteps.map((step) => (
+                    {(post.bug.reproductionSteps ?? []).map((step) => (
                       <li key={step}>{step}</li>
                     ))}
                   </ol>

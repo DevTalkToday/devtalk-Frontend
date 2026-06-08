@@ -298,7 +298,7 @@ function MessagesContent() {
         <section className="grid h-[calc(100vh-8.5rem)] min-h-0 gap-5 overflow-hidden lg:grid-cols-[300px_minmax(0,1fr)_280px]">
           <aside className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] border border-(--border) bg-(--surface) p-4 shadow-(--shadow)">
             <h1 className="px-2 pb-4 text-3xl font-semibold">메시지</h1>
-            <div className="themed-scrollbar grid min-h-0 auto-rows-max content-start gap-3 overflow-y-auto pr-1">
+            <div className="themed-scrollbar grid min-h-0 auto-rows-max content-start gap-3 overflow-x-hidden overflow-y-auto pr-1">
               {loadingConversations ? <p className="px-2 text-sm text-(--muted-strong)">대화 목록을 불러오는 중입니다.</p> : null}
               {!loadingConversations && conversations.length === 0 ? (
                 <p className="px-2 text-sm leading-6 text-(--muted-strong)">친구 목록에서 채팅 버튼을 눌러 대화를 시작해 주세요.</p>
@@ -313,27 +313,27 @@ function MessagesContent() {
                     type="button"
                     onClick={() => selectConversation(friend.id)}
                     className={[
-                      "grid h-[112px] gap-3 border p-4 text-left transition duration-150",
+                      "grid h-[112px] gap-3 overflow-hidden border p-4 text-left transition duration-150",
                       selected
                         ? "border-(--accent) bg-(--accent-soft)"
                         : "border-(--border) bg-(--surface-raised) hover:border-(--accent)",
                     ].join(" ")}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
                       <Avatar user={friend} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <strong className="text-base">{friend.nickname}</strong>
-                          <span className="border border-(--border) bg-(--surface-soft) px-2 py-0.5 text-xs text-(--muted-strong)">
+                      <div className="min-w-0 flex-1 overflow-hidden">
+                        <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+                          <strong className="min-w-0 truncate text-base">{friend.nickname}</strong>
+                          <span className="shrink-0 border border-(--border) bg-(--surface-soft) px-2 py-0.5 text-xs text-(--muted-strong)">
                             {getMajor(friend)}
                           </span>
                           {conversation.unreadCount > 0 ? (
-                            <span className="rounded-full bg-(--accent) px-2 py-0.5 text-xs font-semibold text-(--primary-foreground)">
+                            <span className="shrink-0 rounded-full bg-(--accent) px-2 py-0.5 text-xs font-semibold text-(--primary-foreground)">
                               {conversation.unreadCount}
                             </span>
                           ) : null}
                         </div>
-                        <p className="mt-1 line-clamp-2 text-sm leading-5 text-(--muted-strong)">
+                        <p className="mt-1 w-full max-w-full overflow-hidden text-ellipsis whitespace-nowrap pr-1 text-sm leading-5 text-(--muted-strong)">
                           {conversation.lastMessage?.body ?? getDescription(friend)}
                         </p>
                       </div>
@@ -362,22 +362,22 @@ function MessagesContent() {
               )}
             </header>
 
-            <div className="themed-scrollbar min-h-0 space-y-3 overflow-y-auto p-5">
+            <div className="themed-scrollbar min-h-0 space-y-3 overflow-x-hidden overflow-y-auto p-5">
               {loadingMessages ? <p className="text-sm text-(--muted-strong)">메시지를 불러오는 중입니다.</p> : null}
               {!loadingMessages && selectedUser && messages.length === 0 ? (
                 <p className="text-sm text-(--muted-strong)">아직 주고받은 메시지가 없습니다.</p>
               ) : null}
               {messages.map((message) => (
-                <div key={message.id} className={["flex", message.mine ? "justify-end" : "justify-start"].join(" ")}>
+                <div key={message.id} className={["flex min-w-0", message.mine ? "justify-end" : "justify-start"].join(" ")}>
                   <div
                     className={[
-                      "max-w-[72%] border px-4 py-3 text-sm leading-6",
+                      "min-w-0 max-w-[72%] overflow-hidden border px-4 py-3 text-sm leading-6",
                       message.mine
                         ? "border-(--accent) bg-(--accent) text-(--primary-foreground)"
                         : "border-(--border) bg-(--surface-raised) text-(--foreground)",
                     ].join(" ")}
                   >
-                    <p>{message.body}</p>
+                    <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.body}</p>
                     <p className="mt-1 text-xs opacity-70">{formatMessageTime(message.createdAt)}</p>
                   </div>
                 </div>

@@ -1,10 +1,16 @@
-import { createPKCE, randomString } from "./pkce";
+import { createPKCE, hasSecurePkceSupport, randomString } from "./pkce";
 
 const KEY = "oauth:google";
+
+export const canUseGoogleLogin = () =>
+  typeof window !== "undefined" && window.isSecureContext && hasSecurePkceSupport();
 
 export const startGoogleLogin = async () => {
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
   if (!clientId) throw new Error("NEXT_PUBLIC_GOOGLE_CLIENT_ID is missing");
+  if (!canUseGoogleLogin()) {
+    throw new Error("Google 로그인은 HTTPS 환경에서만 사용할 수 있습니다.");
+  }
 
   const { verifier, challenge } = await createPKCE();
   const state = randomString(32);
