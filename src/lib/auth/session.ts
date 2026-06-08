@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const ACCESS_TOKEN_KEY = "accessToken";
 const AUTH_USER_KEY = "authUser";
-const AUTH_CHANGED_EVENT = "devtalk-auth-changed";
+export const AUTH_CHANGED_EVENT = "devtalk-auth-changed";
 
 type GuestTokenResponse = {
   accessToken: string;
