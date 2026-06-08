@@ -126,9 +126,6 @@ export function PostComments({
     activeCommentAction?.type === "delete" && activeCommentAction.commentId === commentId;
   const isAcceptingPending = (commentId: string) =>
     activeCommentAction?.type === "accept" && activeCommentAction.commentId === commentId;
-  const isLikingPending = (commentId: string) =>
-    activeCommentAction?.type === "like" && activeCommentAction.commentId === commentId;
-
   const requireLogin = () => {
     if (isLoggedIn()) return true;
     router.push("/login");

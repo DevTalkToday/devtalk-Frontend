@@ -44,6 +44,10 @@ export type BugMeta = {
   reproductionSteps: string[];
   watchers: number;
   acceptedCommentId: string | null;
+  priority?: string;
+  assignee?: string;
+  environment?: string;
+  labels?: string[];
 };
 
 export type QuestionPayload = {
@@ -51,6 +55,9 @@ export type QuestionPayload = {
   actual: string;
   reproductionSteps: string[];
   acceptedCommentId?: string | null;
+  solved?: boolean;
+  environment?: string;
+  tried?: string;
 };
 
 export type BugPayload = {
@@ -60,6 +67,10 @@ export type BugPayload = {
   reproductionSteps: string[];
   watchers?: number;
   acceptedCommentId?: string | null;
+  priority?: string;
+  assignee?: string;
+  environment?: string;
+  labels?: string[];
 };
 
 export type PostDetail = {

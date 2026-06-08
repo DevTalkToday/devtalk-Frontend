@@ -177,32 +177,55 @@ export function PostForm({ mode, postId, initialPost }: Props) {
     setSubmitting(true);
 
     try {
+      const acceptedCommentId =
+        form.category === "qna"
+          ? initialPost?.question?.acceptedCommentId ?? initialPost?.bug?.acceptedCommentId ?? null
+          : initialPost?.bug?.acceptedCommentId ?? initialPost?.question?.acceptedCommentId ?? null;
+
+      const resolvedQuestionPayload = {
+        expected: form.questionExpected,
+        actual: form.questionActual,
+        reproductionSteps: fromLines(form.questionSteps),
+        acceptedCommentId,
+        solved: true,
+        environment: form.questionExpected,
+        tried: form.questionActual,
+      };
+
+      const resolvedBugPayload = {
+        status: "closed" as const,
+        expected: form.questionExpected,
+        actual: form.questionActual,
+        reproductionSteps: fromLines(form.questionSteps),
+        watchers: initialPost?.bug?.watchers ?? 0,
+        acceptedCommentId,
+        priority: initialPost?.bug?.priority ?? "P2",
+        assignee: initialPost?.bug?.assignee ?? "",
+        environment: initialPost?.bug?.environment ?? "",
+        labels: initialPost?.bug?.labels ?? [],
+      };
+
+      const activeBugPayload = {
+        status: form.bugStatus,
+        expected: form.bugExpected,
+        actual: form.bugActual,
+        reproductionSteps: fromLines(form.bugSteps),
+        watchers: initialPost?.bug?.watchers ?? 0,
+        acceptedCommentId,
+        priority: initialPost?.bug?.priority ?? "P2",
+        assignee: initialPost?.bug?.assignee ?? "",
+        environment: initialPost?.bug?.environment ?? "",
+        labels: initialPost?.bug?.labels ?? [],
+      };
+
       const payload = {
         title: form.title,
         content: form.content,
-        category: form.category,
+        category: form.category === "qna" ? "bug" : form.category,
         tags: fromCsv(form.tagsText),
         majors: selectedMajors,
-        question:
-          form.category === "qna"
-            ? {
-                expected: form.questionExpected,
-                actual: form.questionActual,
-                reproductionSteps: fromLines(form.questionSteps),
-                acceptedCommentId: initialPost?.question?.acceptedCommentId ?? null,
-              }
-            : undefined,
-        bug:
-          form.category === "bug"
-            ? {
-                status: form.bugStatus,
-                expected: form.bugExpected,
-                actual: form.bugActual,
-                reproductionSteps: fromLines(form.bugSteps),
-                watchers: initialPost?.bug?.watchers ?? 0,
-                acceptedCommentId: initialPost?.bug?.acceptedCommentId ?? null,
-              }
-            : undefined,
+        question: form.category === "qna" ? resolvedQuestionPayload : undefined,
+        bug: form.category === "qna" ? resolvedBugPayload : form.category === "bug" ? activeBugPayload : undefined,
       };
 
       const response =
