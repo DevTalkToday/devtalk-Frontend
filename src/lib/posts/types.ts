@@ -22,6 +22,7 @@ export type PostComment = {
   createdAt: string;
   updatedAt?: string;
   likeCount: number;
+  liked: boolean;
   isAccepted?: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
@@ -74,6 +75,7 @@ export type PostDetail = {
   likeCount: number;
   bookmarkCount: number;
   bookmarked: boolean;
+  liked: boolean;
   viewCount: number;
   tags: string[];
   majors: string[];
