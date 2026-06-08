@@ -1,4 +1,4 @@
-import { createPKCE, randomString } from "./pkce";
+import { createPKCE, hasSecurePkceSupport, randomString } from "./pkce";
 
 const KEY = "oauth:github";
 
@@ -6,7 +6,14 @@ export const startGithubLogin = async () => {
   const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID ?? "";
   if (!clientId) throw new Error("NEXT_PUBLIC_GITHUB_CLIENT_ID is missing");
 
-  const { verifier, challenge } = await createPKCE();
+  let verifier: string | null = null;
+  let challenge: string | null = null;
+  if (hasSecurePkceSupport()) {
+    const pkce = await createPKCE();
+    verifier = pkce.verifier;
+    challenge = pkce.challenge;
+  }
+
   const state = randomString(32);
   const redirectUri = `${window.location.origin}/auth/callback/github`;
 
@@ -20,8 +27,10 @@ export const startGithubLogin = async () => {
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("scope", "read:user user:email");
   url.searchParams.set("state", state);
-  url.searchParams.set("code_challenge", challenge);
-  url.searchParams.set("code_challenge_method", "S256");
+  if (challenge) {
+    url.searchParams.set("code_challenge", challenge);
+    url.searchParams.set("code_challenge_method", "S256");
+  }
 
   window.location.href = url.toString();
 };
@@ -32,7 +41,7 @@ export const readGithubSession = () => {
   try {
     return JSON.parse(raw) as {
       state: string;
-      verifier: string;
+      verifier: string | null;
       redirectUri: string;
       createdAt: number;
     };

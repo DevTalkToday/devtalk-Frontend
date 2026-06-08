@@ -7,7 +7,7 @@ import { FetchPost } from "@/lib/api/fetch";
 import { saveAuthSession } from "@/lib/auth/session";
 
 type Result =
-  | { ok: true; code: string; redirectUri: string; codeVerifier: string }
+  | { ok: true; code: string; redirectUri: string; codeVerifier: string | null }
   | { ok: false; message: string };
 
 type AuthResponse = {

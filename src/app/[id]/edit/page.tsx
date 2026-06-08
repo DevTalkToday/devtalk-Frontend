@@ -24,26 +24,12 @@ export default function EditPostPage() {
   return (
     <AppShell
       title={post ? `${CATEGORY_LABELS[post.category]} 수정` : "게시글 수정"}
-      description="기존 메타와 댓글은 유지하고, 본문과 카테고리별 필드를 갱신하는 편집 화면입니다."
+      description="가이드라인을 준수하여 작성해주세요."
       actions={
-        <Link
-          href={post ? `/${post.id}` : "/"}
-          className={buttonClassName()}
-        >
+        <Link href={post ? `/${post.id}` : "/"} className={buttonClassName()}>
           <ArrowLeftIcon className="size-4" />
           돌아가기
         </Link>
-      }
-      sidebar={
-        post ? (
-          <div className="grid gap-3 pt-2">
-            <div className="grid gap-1 rounded-3xl border border-(--border) bg-(--surface-raised) p-4">
-              <span className="text-[0.72rem] font-bold uppercase tracking-[0.24em] text-(--muted)">Editing</span>
-              <strong className="text-lg">{post.title}</strong>
-              <span className="text-sm text-(--muted-strong)">{CATEGORY_LABELS[post.category]} 글 편집 중</span>
-            </div>
-          </div>
-        ) : null
       }
     >
       {isLoading ? (

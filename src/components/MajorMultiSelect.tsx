@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FetchGet } from "@/lib/api/fetch";
@@ -11,6 +12,7 @@ type Props = {
   onChange: (next: string[]) => void;
   maxSelect?: number;
   valueMode?: "code" | "label";
+  afterOptions?: ReactNode;
 };
 
 type ItemsResponse = { items: MajorOption[] };
@@ -27,7 +29,7 @@ const normalizeMajors = (data: unknown): MajorOption[] => {
   return [];
 };
 
-export default function MajorMultiSelect({ value, onChange, maxSelect, valueMode = "code" }: Props) {
+export default function MajorMultiSelect({ value, onChange, maxSelect, valueMode = "code", afterOptions }: Props) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["majors"],
     queryFn: () => FetchGet("/majors"),
@@ -74,6 +76,7 @@ export default function MajorMultiSelect({ value, onChange, maxSelect, valueMode
           </button>
         );
       })}
+      {afterOptions}
     </div>
   );
 }
