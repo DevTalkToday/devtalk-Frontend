@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { CommentActionsMenu, type MenuItem } from "@/components/devtalk/comment-actions-menu";
+import { HeartIcon } from "@/components/devtalk/icons";
 import { ReportDialog, type ReportTarget } from "@/components/devtalk/report-dialog";
 import { Button, Field, Textarea } from "@/components/ui";
 import { FetchDeleteAuth, FetchPatchAuth, FetchPostAuth, FetchPutAuth } from "@/lib/api/fetch";
@@ -16,13 +17,14 @@ type CommentAction =
   | { type: "create"; body: string }
   | { type: "edit"; commentId: string; body: string }
   | { type: "delete"; commentId: string }
-  | { type: "accept"; commentId: string; accepted: boolean };
+  | { type: "accept"; commentId: string; accepted: boolean }
+  | { type: "like"; commentId: string; liked: boolean };
 
 const getComposerCopy = (category: PostCategory) => {
   if (category === "qna") {
     return {
       title: "답변 남기기",
-      description: "문제 원인이나 해결 방법을 댓글로 남기고, 좋은 답변은 채택할 수 있습니다.",
+      description: "문제 원인이나 해결 방법을 댓글로 남기고 좋은 답변은 채택할 수 있습니다.",
       placeholder: "원인 분석, 해결 코드, 참고 자료를 정리해보세요.",
       submitLabel: "답변 등록",
     };
@@ -31,15 +33,15 @@ const getComposerCopy = (category: PostCategory) => {
   if (category === "bug") {
     return {
       title: "조사 로그 남기기",
-      description: "작성자에게 도움된 댓글은 채택될 수 있습니다.",
-      placeholder: "재현 로그, 원인 추정, 임시 우회 방법 등을 남겨보세요.",
+      description: "작성자에게 도움이 되는 분석 댓글은 채택할 수 있습니다.",
+      placeholder: "재현 로그, 원인 추정, 임시 회피 방법 등을 남겨보세요.",
       submitLabel: "댓글 등록",
     };
   }
 
   return {
     title: "댓글 남기기",
-    description: "의견, 추가 맥락, 후속 질문을 자유롭게 이어서 남길 수 있습니다.",
+    description: "의견, 추가 맥락, 후속 질문 등을 자유롭게 이어갈 수 있습니다.",
     placeholder: "이 주제에 대한 의견을 남겨보세요.",
     submitLabel: "댓글 등록",
   };
@@ -97,6 +99,12 @@ export function PostComments({
           return (await FetchPatchAuth(`/posts/${post.id}/comments/${action.commentId}`, {
             accepted: action.accepted,
           })) as PostDetail;
+        case "like":
+          return (
+            action.liked
+              ? await FetchDeleteAuth(`/posts/${post.id}/comments/${action.commentId}/like`)
+              : await FetchPostAuth(`/posts/${post.id}/comments/${action.commentId}/like`)
+          ) as PostDetail;
       }
     },
     onSuccess: (nextPost, action) => {
@@ -118,14 +126,19 @@ export function PostComments({
     activeCommentAction?.type === "delete" && activeCommentAction.commentId === commentId;
   const isAcceptingPending = (commentId: string) =>
     activeCommentAction?.type === "accept" && activeCommentAction.commentId === commentId;
+  const isLikingPending = (commentId: string) =>
+    activeCommentAction?.type === "like" && activeCommentAction.commentId === commentId;
+
+  const requireLogin = () => {
+    if (isLoggedIn()) return true;
+    router.push("/login");
+    return false;
+  };
 
   const submitComment = () => {
     const body = draftComment.trim();
     if (!body || commentMutation.isPending) return;
-    if (!isLoggedIn()) {
-      router.push("/login");
-      return;
-    }
+    if (!requireLogin()) return;
     commentMutation.reset();
     commentMutation.mutate({ type: "create", body });
   };
@@ -145,20 +158,14 @@ export function PostComments({
   const saveCommentEdit = (commentId: string) => {
     const body = editingCommentBody.trim();
     if (!body || commentMutation.isPending) return;
-    if (!isLoggedIn()) {
-      router.push("/login");
-      return;
-    }
+    if (!requireLogin()) return;
     commentMutation.reset();
     commentMutation.mutate({ type: "edit", commentId, body });
   };
 
   const removeComment = (commentId: string) => {
     if (commentMutation.isPending) return;
-    if (!isLoggedIn()) {
-      router.push("/login");
-      return;
-    }
+    if (!requireLogin()) return;
     if (!window.confirm("이 댓글을 삭제할까요?")) return;
     commentMutation.reset();
     commentMutation.mutate({ type: "delete", commentId });
@@ -166,12 +173,16 @@ export function PostComments({
 
   const toggleCommentAccept = (comment: PostComment) => {
     if (commentMutation.isPending) return;
-    if (!isLoggedIn()) {
-      router.push("/login");
-      return;
-    }
+    if (!requireLogin()) return;
     commentMutation.reset();
     commentMutation.mutate({ type: "accept", commentId: comment.id, accepted: !comment.isAccepted });
+  };
+
+  const toggleCommentLike = (comment: PostComment) => {
+    if (commentMutation.isPending) return;
+    if (!requireLogin()) return;
+    commentMutation.reset();
+    commentMutation.mutate({ type: "like", commentId: comment.id, liked: comment.liked });
   };
 
   return (
@@ -179,7 +190,7 @@ export function PostComments({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-1">
           <p className="text-lg font-semibold tracking-[-0.03em]">댓글 스레드</p>
-          <p className="text-sm text-(--muted-strong)">가이드라인에 맞춰 자유롭게 작성해 주세요.</p>
+          <p className="text-sm text-(--muted-strong)">가이드라인에 맞춰 자유롭게 의견을 남겨주세요.</p>
         </div>
         <span className="inline-flex w-fit items-center justify-center gap-1 rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1.5 text-xs font-semibold tracking-[0.02em] text-(--muted-strong)">
           {(post.comments ?? []).length} comments
@@ -208,7 +219,7 @@ export function PostComments({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-(--muted)">`Ctrl + Enter` 또는 `Cmd + Enter`로 바로 등록할 수 있습니다.</p>
           <Button type="button" variant="primary" onClick={submitComment} disabled={!draftComment.trim() || commentMutation.isPending}>
-            {isCreatingComment ? "등록 중..." : composerCopy.submitLabel}
+            {isCreatingComment ? "등록 중.." : composerCopy.submitLabel}
           </Button>
         </div>
       </div>
@@ -218,9 +229,7 @@ export function PostComments({
           {orderedComments.map((comment) => {
             const isEditing = editingCommentId === comment.id;
             const isEdited = Boolean(comment.updatedAt && comment.updatedAt !== comment.createdAt);
-            const canAccept =
-              (post.category === "qna" && post.question) ||
-              (post.category === "bug" && post.bug);
+            const canAccept = (post.category === "qna" && post.question) || (post.category === "bug" && post.bug);
             const isPostAuthorComment = comment.author.id === post.author.id;
             const menuItems: MenuItem[] = [];
 
@@ -250,7 +259,7 @@ export function PostComments({
                   setReportTarget({
                     type: "comment",
                     id: comment.id,
-                    label: preview ? `${comment.author.nickname}님의 댓글: ${preview}` : `${comment.author.nickname}님의 댓글`,
+                    label: preview ? `${comment.author.nickname}의 댓글: ${preview}` : `${comment.author.nickname}의 댓글`,
                     url: `/${post.id}#comment-${comment.id}`,
                   }),
                 disabled: commentMutation.isPending,
@@ -288,12 +297,7 @@ export function PostComments({
                       ) : null}
                     </div>
                   </div>
-                  {menuItems.length ? (
-                    <CommentActionsMenu
-                      disabled={commentMutation.isPending}
-                      items={menuItems}
-                    />
-                  ) : null}
+                  {menuItems.length ? <CommentActionsMenu disabled={commentMutation.isPending} items={menuItems} /> : null}
                 </div>
 
                 {isEditing ? (
@@ -318,8 +322,14 @@ export function PostComments({
                         <Button type="button" size="sm" onClick={cancelEditingComment} disabled={commentMutation.isPending}>
                           취소
                         </Button>
-                        <Button type="button" variant="primary" size="sm" onClick={() => saveCommentEdit(comment.id)} disabled={!editingCommentBody.trim() || commentMutation.isPending}>
-                          {isEditingPending(comment.id) ? "저장 중..." : "수정 저장"}
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          onClick={() => saveCommentEdit(comment.id)}
+                          disabled={!editingCommentBody.trim() || commentMutation.isPending}
+                        >
+                          {isEditingPending(comment.id) ? "저장 중.." : "수정 저장"}
                         </Button>
                       </div>
                     </div>
@@ -327,10 +337,24 @@ export function PostComments({
                 ) : (
                   <>
                     <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-(--muted-strong)">{comment.body}</p>
-                    <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-(--muted)">
-                      <span>좋아요 {comment.likeCount}</span>
-                      {isDeletingPending(comment.id) ? <span>삭제 중...</span> : null}
-                      {isAcceptingPending(comment.id) ? <span>{comment.isAccepted ? "채택 취소 중..." : "채택 중..."}</span> : null}
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-(--muted)">
+                      <div className="flex flex-wrap items-center gap-3">
+                        {isDeletingPending(comment.id) ? <span>삭제 중..</span> : null}
+                        {isAcceptingPending(comment.id) ? (
+                          <span>{comment.isAccepted ? "채택 취소 중.." : "채택 중.."}</span>
+                        ) : null}
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={comment.liked ? "primary" : "surface"}
+                        onClick={() => toggleCommentLike(comment)}
+                        disabled={commentMutation.isPending}
+                        aria-pressed={comment.liked}
+                      >
+                        <HeartIcon className="size-4" fill={comment.liked ? "currentColor" : "none"} />
+                        {comment.likeCount}
+                      </Button>
                     </div>
                   </>
                 )}
@@ -339,7 +363,9 @@ export function PostComments({
           })}
         </div>
       ) : (
-        <div className="rounded-3xl border border-dashed border-(--border) bg-(--surface-raised) p-6 text-sm text-(--muted-strong)">아직 댓글이 없습니다. 첫 번째 댓글을 남겨 대화를 시작해보세요.</div>
+        <div className="rounded-3xl border border-dashed border-(--border) bg-(--surface-raised) p-6 text-sm text-(--muted-strong)">
+          아직 댓글이 없습니다. 첫 번째 댓글로 대화를 시작해보세요.
+        </div>
       )}
       <ReportDialog
         target={reportTarget}

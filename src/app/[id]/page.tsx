@@ -47,6 +47,7 @@ export default function PostDetailPage() {
   const { ready, loggedIn } = useAuthStatus();
   const [deleting, setDeleting] = useState(false);
   const [bookmarking, setBookmarking] = useState(false);
+  const [liking, setLiking] = useState(false);
 
   useEffect(() => {
     trackedViewRef.current = false;
@@ -111,6 +112,27 @@ export default function PostDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ["profile", "bookmarks"] });
     } finally {
       setBookmarking(false);
+    }
+  };
+
+  const toggleLike = async () => {
+    if (!post || liking) return;
+    if (ready && !loggedIn) {
+      router.push("/login");
+      return;
+    }
+
+    setLiking(true);
+    try {
+      const nextPost = (
+        post.liked
+          ? await FetchDeleteAuth(`/posts/${post.id}/like`)
+          : await FetchPostAuth(`/posts/${post.id}/like`)
+      ) as PostDetail;
+      syncPost(nextPost);
+      void queryClient.invalidateQueries({ queryKey: ["profile"] });
+    } finally {
+      setLiking(false);
     }
   };
 
@@ -240,6 +262,19 @@ export default function PostDetailPage() {
               ) : null}
 
               <MarkdownBody value={post.content} />
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={toggleLike}
+                  disabled={liking}
+                  aria-pressed={post.liked}
+                  className={buttonClassName({ variant: post.liked ? "primary" : "surface", size: "sm" })}
+                >
+                  <HeartIcon className="size-4" fill={post.liked ? "currentColor" : "none"} />
+                  {post.likeCount}
+                </button>
+              </div>
             </section>
 
             <PostComments key={post.id} post={post} onPostChange={syncPost} />

@@ -82,6 +82,20 @@ const createInitialState = (post?: PostDetail): FormState => {
   };
 };
 
+const copyBugFieldsToQuestion = (form: FormState): FormState => ({
+  ...form,
+  questionExpected: form.bugExpected,
+  questionActual: form.bugActual,
+  questionSteps: form.bugSteps,
+});
+
+const copyQuestionFieldsToBug = (form: FormState): FormState => ({
+  ...form,
+  bugExpected: form.questionExpected,
+  bugActual: form.questionActual,
+  bugSteps: form.questionSteps,
+});
+
 export function PostForm({ mode, postId, initialPost }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => createInitialState(initialPost));
@@ -98,6 +112,49 @@ export function PostForm({ mode, postId, initialPost }: Props) {
 
   const patch = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const changeCategory = (category: PostCategory) => {
+    setForm((current) => {
+      if (current.category === category) return current;
+
+      if (current.category === "bug" && category === "qna") {
+        return {
+          ...copyBugFieldsToQuestion(current),
+          category,
+        };
+      }
+
+      if (current.category === "qna" && category === "bug") {
+        return {
+          ...copyQuestionFieldsToBug(current),
+          category,
+          bugStatus: current.bugStatus === "closed" ? "fixed" : current.bugStatus,
+        };
+      }
+
+      return {
+        ...current,
+        category,
+      };
+    });
+  };
+
+  const changeBugStatus = (status: BugStatus) => {
+    setForm((current) => {
+      if (status !== "closed") {
+        return {
+          ...current,
+          bugStatus: status,
+        };
+      }
+
+      return {
+        ...copyBugFieldsToQuestion(current),
+        category: "qna",
+        bugStatus: status,
+      };
+    });
   };
 
   const toggleCustomMajorInput = () => {
@@ -178,7 +235,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
             <ChipGroup
               label="기록 유형*"
               value={form.category}
-              onChange={(category) => patch("category", category)}
+              onChange={changeCategory}
               options={[
                 { value: "qna", label: CATEGORY_LABELS.qna },
                 { value: "bug", label: CATEGORY_LABELS.bug },
@@ -283,7 +340,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
           <ChipGroup
             label="상태*"
             value={form.bugStatus}
-            onChange={(status) => patch("bugStatus", status)}
+            onChange={changeBugStatus}
             options={BUG_STATUS_FORM_OPTIONS.map((status) => ({
               value: status,
               label: BUG_STATUS_LABELS[status],
