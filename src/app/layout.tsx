@@ -5,6 +5,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Devtalk",
   description: "Developer communication platform",
+  icons: {
+    icon: "/DevTalk.svg",
+    shortcut: "/DevTalk.svg",
+    apple: "/DevTalk.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
