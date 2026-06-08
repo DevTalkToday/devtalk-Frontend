@@ -69,6 +69,7 @@
 "use client";
 
 import { clearAuthSession, getOptionalUserAccessToken, getRequiredAccessToken } from "@/lib/auth/session";
+import { normalizePostApiResponse } from "@/lib/posts/response";
 import { showErrorToast } from "@/lib/toast/events";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -303,7 +304,7 @@ const request = async ({ method, path, data, auth, noStore, suppressErrorToast =
     throw new Error(message);
   }
 
-  return payload;
+  return normalizePostApiResponse(path, payload);
 };
 
 export const FetchGet = (path: string) => request({ method: "GET", path, auth: "optional", noStore: true });
