@@ -68,9 +68,21 @@
 
 "use client";
 
-import { clearAuthSession, getOptionalUserAccessToken, getRequiredAccessToken } from "@/lib/auth/session";
+import { clearAuthSession, getOptionalUserAccessToken, getRequiredAccessToken, isLogoutRedirecting } from "@/lib/auth/session";
 import { normalizePostApiResponse } from "@/lib/posts/response";
 import { showErrorToast } from "@/lib/toast/events";
+
+export class ApiRequestError extends Error {
+  status: number;
+  payload?: unknown;
+
+  constructor(message: string, status: number, payload?: unknown) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.payload = payload;
+  }
+}
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type AuthMode = "none" | "optional" | "required";
@@ -254,15 +266,16 @@ const resolveAccessToken = (auth: AuthMode | undefined) => {
 };
 
 const request = async ({ method, path, data, auth, noStore, suppressErrorToast = false }: RequestOptions) => {
+  const shouldSuppressErrorToast = suppressErrorToast || (auth === "required" && isLogoutRedirecting());
   let accessToken: string | null;
   try {
     accessToken = resolveAccessToken(auth);
   } catch {
     const message = getFriendlyErrorMessage(401, { message: "Login is required" });
-    if (!suppressErrorToast) {
+    if (!shouldSuppressErrorToast) {
       showErrorToast(message);
     }
-    throw new Error(message);
+    throw new ApiRequestError(message, 401);
   }
 
   const url = resolveUrl(path);
@@ -286,10 +299,10 @@ const request = async ({ method, path, data, auth, noStore, suppressErrorToast =
     payload = await parsePayload(res);
   } catch {
     const message = "서버에 연결할 수 없습니다.";
-    if (!suppressErrorToast) {
+    if (!shouldSuppressErrorToast) {
       showErrorToast(message);
     }
-    throw new Error(message);
+    throw new ApiRequestError(message, 0);
   }
 
   if (!res.ok) {
@@ -298,10 +311,10 @@ const request = async ({ method, path, data, auth, noStore, suppressErrorToast =
     }
 
     const message = getFriendlyErrorMessage(res.status, payload);
-    if (!suppressErrorToast) {
+    if (!shouldSuppressErrorToast) {
       showErrorToast(message);
     }
-    throw new Error(message);
+    throw new ApiRequestError(message, res.status, payload);
   }
 
   return normalizePostApiResponse(path, payload);
@@ -318,6 +331,8 @@ export const FetchGetAuth = (path: string) => request({ method: "GET", path, aut
 export const FetchGetAuthSilent = (path: string) =>
   request({ method: "GET", path, auth: "required", noStore: true, suppressErrorToast: true });
 export const FetchPostAuth = (path: string, data?: unknown) => request({ method: "POST", path, auth: "required", data, noStore: true });
+export const FetchPostAuthSilent = (path: string, data?: unknown) =>
+  request({ method: "POST", path, auth: "required", data, noStore: true, suppressErrorToast: true });
 export const FetchPutAuth = (path: string, data?: unknown) => request({ method: "PUT", path, auth: "required", data, noStore: true });
 export const FetchPatchAuth = (path: string, data?: unknown) => request({ method: "PATCH", path, auth: "required", data, noStore: true });
 export const FetchDeleteAuth = (path: string) => request({ method: "DELETE", path, auth: "required", noStore: true });

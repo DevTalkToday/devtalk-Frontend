@@ -8,7 +8,7 @@ import { AppShell } from "@/components/devtalk/app-shell";
 import { EllipsisIcon, PlusIcon, TrashIcon } from "@/components/devtalk/icons";
 import { PostCard } from "@/components/devtalk/post-card";
 import { buttonClassName } from "@/components/ui";
-import { FetchGetAuth, FetchGetAuthSilent, FetchPatchAuth } from "@/lib/api/fetch";
+import { ApiRequestError, FetchGet, FetchGetAuth, FetchGetAuthSilent, FetchPatchAuth } from "@/lib/api/fetch";
 import { getAccessToken, getAuthUser, saveAuthSession, useAuthStatus } from "@/lib/auth/session";
 import { CATEGORY_LABELS, type PostCategory, type PostSummary } from "@/lib/posts/types";
 
@@ -28,6 +28,14 @@ type AuthUser = {
 
 type PostsResponse = {
   items: PostSummary[];
+  pageInfo?: {
+    page: number;
+    limit: number;
+    totalCount: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
 };
 
 type ProfileResponse = {
@@ -61,6 +69,9 @@ const tabs: Array<{ id: ProfileTab; label: string }> = [
   { id: "bookmarks", label: "내 북마크" },
 ];
 
+const BOOKMARK_FALLBACK_SCAN_LIMIT = 24;
+const BOOKMARK_FALLBACK_SCAN_MAX_PAGES = 40;
+
 const asAuthUser = (value: unknown): AuthUser | null => {
   if (!value || typeof value !== "object") return null;
   return value as AuthUser;
@@ -85,8 +96,35 @@ const formatDate = (value?: string | null) => {
   }).format(date);
 };
 
+const fetchBookmarkListFallback = async (requestedLimit: number): Promise<PostsResponse> => {
+  const items: PostSummary[] = [];
+  const seen = new Set<string>();
+  let page = 1;
+  let totalPages = 1;
+
+  while (page <= totalPages && page <= BOOKMARK_FALLBACK_SCAN_MAX_PAGES && items.length < requestedLimit) {
+    const response = (await FetchGet(
+      `/posts?sort=latest&page=${page}&limit=${BOOKMARK_FALLBACK_SCAN_LIMIT}`,
+    )) as PostsResponse;
+
+    totalPages = response.pageInfo?.totalPages ?? page;
+
+    for (const post of response.items) {
+      if (!post.bookmarked || seen.has(post.id)) continue;
+      seen.add(post.id);
+      items.push(post);
+      if (items.length >= requestedLimit) break;
+    }
+
+    if (!response.pageInfo?.hasNextPage || response.items.length === 0) break;
+    page += 1;
+  }
+
+  return { items };
+};
+
 export default function ProfilePage() {
-  const { ready, loggedIn } = useAuthStatus();
+  const { ready, loggedIn, redirectingAfterLogout } = useAuthStatus();
   const [activeTab, setActiveTab] = useState<ProfileTab>("info");
   const [isEditing, setIsEditing] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -103,16 +141,20 @@ export default function ProfilePage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
 
-  const sessionUser = useMemo(() => (ready && loggedIn ? asAuthUser(getAuthUser()) : null), [ready, loggedIn]);
+  const canLoadPrivateProfile = ready && loggedIn && !redirectingAfterLogout;
+  const sessionUser = useMemo(
+    () => (canLoadPrivateProfile ? asAuthUser(getAuthUser()) : null),
+    [canLoadPrivateProfile],
+  );
 
   const profileQuery = useQuery({
     queryKey: ["profile", "me"],
-    enabled: ready && loggedIn,
+    enabled: canLoadPrivateProfile,
     queryFn: () => FetchGetAuth("/profile/me") as Promise<ProfileResponse>,
     retry: false,
   });
 
-  const user = localUser ?? profileQuery.data?.user ?? sessionUser;
+  const user = canLoadPrivateProfile ? (localUser ?? profileQuery.data?.user ?? sessionUser) : null;
 
   const userId = user?.id == null ? "" : String(user.id);
   const nickname = user?.nickname?.trim() || user?.username?.trim() || "사용자";
@@ -127,22 +169,31 @@ export default function ProfilePage() {
 
   const postsQuery = useQuery({
     queryKey: ["profile", "posts", userId],
-    enabled: Boolean(userId),
+    enabled: canLoadPrivateProfile && Boolean(userId),
     queryFn: () => FetchGetAuth("/profile/me/posts?page=1&limit=48") as Promise<PostsResponse>,
     retry: false,
   });
 
   const commentsQuery = useQuery({
     queryKey: ["profile", "comments", userId],
-    enabled: Boolean(userId),
+    enabled: canLoadPrivateProfile && Boolean(userId),
     queryFn: () => FetchGetAuth("/profile/me/comments?page=1&limit=48") as Promise<CommentsResponse>,
     retry: false,
   });
 
   const bookmarksQuery = useQuery({
     queryKey: ["profile", "bookmarks", userId],
-    enabled: Boolean(userId) && activeTab === "bookmarks",
-    queryFn: () => FetchGetAuthSilent("/profile/me/bookmarks?page=1&limit=48") as Promise<PostsResponse>,
+    enabled: canLoadPrivateProfile && Boolean(userId) && activeTab === "bookmarks",
+    queryFn: async () => {
+      try {
+        return (await FetchGetAuthSilent("/profile/me/bookmarks?page=1&limit=48")) as PostsResponse;
+      } catch (error) {
+        if (error instanceof ApiRequestError && error.status === 404) {
+          return fetchBookmarkListFallback(48);
+        }
+        throw error;
+      }
+    },
     retry: false,
   });
 

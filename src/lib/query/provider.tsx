@@ -17,8 +17,9 @@ function AuthAwareQueryCache() {
 
       // Let auth state listeners update first, then drop cached viewer-specific data.
       resetTimer = window.setTimeout(() => {
-        void queryClient.cancelQueries();
-        void queryClient.resetQueries();
+        void queryClient.cancelQueries().finally(() => {
+          queryClient.clear();
+        });
       }, 0);
     };
 
