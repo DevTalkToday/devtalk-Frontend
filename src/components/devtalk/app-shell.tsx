@@ -7,7 +7,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { buttonClassName } from "@/components/ui";
-import { FetchGetAuthSilent, FetchPostAuth } from "@/lib/api/fetch";
+import { FetchGetAuthSilent, FetchPostAuthSilent } from "@/lib/api/fetch";
 import {
   beginLogoutRedirect,
   clearAuthSession,
@@ -335,7 +335,7 @@ export function AppShell({
     beginLogoutRedirect();
 
     try {
-      await FetchPostAuth("/auth/logout");
+      await FetchPostAuthSilent("/auth/logout");
     } catch {
       // The local session should still be cleared even if the server token is already gone.
     } finally {
