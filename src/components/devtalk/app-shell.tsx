@@ -8,7 +8,15 @@ import { useEffect, useRef, useState } from "react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { buttonClassName } from "@/components/ui";
 import { FetchGetAuthSilent, FetchPostAuth } from "@/lib/api/fetch";
-import { clearAuthSession, getAccessToken, getAuthUser, issueFreshGuestToken, useAuthStatus } from "@/lib/auth/session";
+import {
+  beginLogoutRedirect,
+  clearAuthSession,
+  finishLogoutRedirect,
+  getAccessToken,
+  getAuthUser,
+  issueFreshGuestToken,
+  useAuthStatus,
+} from "@/lib/auth/session";
 
 type AppShellProps = {
   title?: string;
@@ -221,6 +229,12 @@ export function AppShell({
   }, [pathname]);
 
   useEffect(() => {
+    if (pathname === "/" && authReady && !loggedIn) {
+      finishLogoutRedirect();
+    }
+  }, [authReady, loggedIn, pathname]);
+
+  useEffect(() => {
     if (!openMenuHref) return;
 
     const handlePointerDown = (event: MouseEvent) => {
@@ -318,6 +332,8 @@ export function AppShell({
       return;
     }
 
+    beginLogoutRedirect();
+
     try {
       await FetchPostAuth("/auth/logout");
     } catch {
@@ -325,7 +341,7 @@ export function AppShell({
     } finally {
       clearAuthSession();
       await issueFreshGuestToken().catch(() => undefined);
-      router.push("/");
+      router.replace("/");
     }
   };
 

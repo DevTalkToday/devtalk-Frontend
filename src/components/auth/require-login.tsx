@@ -6,11 +6,11 @@ import { useAuthStatus } from "@/lib/auth/session";
 
 export function RequireLogin({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { ready, loggedIn } = useAuthStatus();
+  const { ready, loggedIn, redirectingAfterLogout } = useAuthStatus();
 
   if (loggedIn) return <>{children}</>;
 
-  if (!ready) {
+  if (!ready || redirectingAfterLogout) {
     return (
       <main className="grid min-h-screen place-items-center px-5">
         <section className="h-[178px] w-full max-w-md rounded-[28px] border border-(--border) bg-(--surface) p-6 shadow-(--shadow)" />

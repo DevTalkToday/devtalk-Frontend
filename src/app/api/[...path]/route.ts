@@ -23,29 +23,40 @@ const HOP_BY_HOP_HEADERS = new Set([
 ]);
 
 const ABSOLUTE_URL_PATTERN = /^https?:\/\//i;
+const IDEMPOTENT_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const RETRIABLE_UPSTREAM_STATUSES = new Set([404, 502, 503, 504]);
 
 const trimTrailingSlashes = (value: string) => value.replace(/\/+$/, "");
 
 const isAbsoluteUrl = (value: string | undefined) => Boolean(value && ABSOLUTE_URL_PATTERN.test(value));
 
-const resolveProxyBaseUrl = (request: NextRequest) => {
+const unique = <T,>(values: T[]) => Array.from(new Set(values));
+
+const getDefaultProxyCandidates = () => [
+  "http://ssh.gsmsv.site:25124/api",
+  "https://devtalk.kr/api",
+];
+
+const resolveProxyBaseUrls = (request: NextRequest) => {
   const candidates = [
     process.env.API_PROXY_TARGET,
     process.env.NEXT_PUBLIC_API_URL,
     process.env.NEXT_PUBLIC_API_BASE_URL,
+    ...getDefaultProxyCandidates(),
   ]
     .map((value) => value?.trim() ?? "")
     .filter(isAbsoluteUrl)
-    .map(trimTrailingSlashes);
+    .map(trimTrailingSlashes)
+    .filter((candidate) => {
+      try {
+        const targetUrl = new URL(candidate);
+        return !(targetUrl.origin === request.nextUrl.origin && targetUrl.pathname.startsWith("/api"));
+      } catch {
+        return false;
+      }
+    });
 
-  return candidates.find((candidate) => {
-    try {
-      const targetUrl = new URL(candidate);
-      return !(targetUrl.origin === request.nextUrl.origin && targetUrl.pathname.startsWith("/api"));
-    } catch {
-      return false;
-    }
-  });
+  return unique(candidates);
 };
 
 const buildUpstreamUrl = (baseUrl: string, pathSegments: string[], search: string) => {
@@ -82,8 +93,8 @@ const copyResponseHeaders = (response: Response) => {
 };
 
 const handle = async (request: NextRequest, context: RouteContext) => {
-  const proxyBaseUrl = resolveProxyBaseUrl(request);
-  if (!proxyBaseUrl) {
+  const proxyBaseUrls = resolveProxyBaseUrls(request);
+  if (proxyBaseUrls.length === 0) {
     return NextResponse.json(
       {
         message: "API proxy target is not configured",
@@ -93,31 +104,53 @@ const handle = async (request: NextRequest, context: RouteContext) => {
   }
 
   const { path = [] } = await context.params;
-  const upstreamUrl = buildUpstreamUrl(proxyBaseUrl, path, request.nextUrl.search);
   const headers = copyRequestHeaders(request);
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer();
+  const canRetry = IDEMPOTENT_METHODS.has(request.method);
+  let lastErrorResponse: NextResponse | null = null;
 
-  try {
-    const upstreamResponse = await fetch(upstreamUrl, {
-      method: request.method,
-      headers,
-      body,
-      redirect: "manual",
-    });
+  for (const [index, proxyBaseUrl] of proxyBaseUrls.entries()) {
+    const upstreamUrl = buildUpstreamUrl(proxyBaseUrl, path, request.nextUrl.search);
 
-    return new NextResponse(upstreamResponse.body, {
-      status: upstreamResponse.status,
-      statusText: upstreamResponse.statusText,
-      headers: copyResponseHeaders(upstreamResponse),
-    });
-  } catch {
-    return NextResponse.json(
-      {
-        message: "Could not connect to upstream API",
-      },
-      { status: 502 },
-    );
+    try {
+      const upstreamResponse = await fetch(upstreamUrl, {
+        method: request.method,
+        headers,
+        body,
+        redirect: "manual",
+      });
+
+      const proxiedResponse = new NextResponse(upstreamResponse.body, {
+        status: upstreamResponse.status,
+        statusText: upstreamResponse.statusText,
+        headers: copyResponseHeaders(upstreamResponse),
+      });
+
+      if (
+        canRetry &&
+        index < proxyBaseUrls.length - 1 &&
+        RETRIABLE_UPSTREAM_STATUSES.has(upstreamResponse.status)
+      ) {
+        lastErrorResponse = proxiedResponse;
+        continue;
+      }
+
+      return proxiedResponse;
+    } catch {
+      if (canRetry && index < proxyBaseUrls.length - 1) {
+        continue;
+      }
+
+      return NextResponse.json(
+        {
+          message: "Could not connect to upstream API",
+        },
+        { status: 502 },
+      );
+    }
   }
+
+  return lastErrorResponse ?? NextResponse.json({ message: "Could not connect to upstream API" }, { status: 502 });
 };
 
 export const GET = handle;
