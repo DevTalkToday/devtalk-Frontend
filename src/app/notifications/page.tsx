@@ -12,7 +12,8 @@ type NotificationKind =
   | "ADMIN_NOTICE"
   | "REPORT_SUBMITTED"
   | "REPORT_REVIEWED"
-  | "COMMENT_ACCEPTED";
+  | "COMMENT_ACCEPTED"
+  | "FOLLOWING_POST";
 
 type NotificationItem = {
   id: number;
@@ -35,6 +36,7 @@ const kindLabel: Record<NotificationKind, string> = {
   REPORT_SUBMITTED: "신고 접수",
   REPORT_REVIEWED: "신고 확인",
   COMMENT_ACCEPTED: "댓글 채택",
+  FOLLOWING_POST: "팔로우 게시글",
 };
 
 function formatNotificationTime(value: string) {

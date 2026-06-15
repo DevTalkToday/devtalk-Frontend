@@ -2,6 +2,7 @@
 
 :root,
 html[data-theme="dark"] {
+  color-scheme: dark;
   --background: #050805;
   --foreground: #eef7ec;
   --muted: rgba(191, 221, 187, 0.62);
@@ -33,6 +34,7 @@ html[data-theme="dark"] {
 }
 
 html[data-theme="light"] {
+  color-scheme: light;
   --background: #f3f7ff;
   --foreground: #081326;
   --muted: rgba(8, 19, 38, 0.52);
@@ -198,6 +200,31 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+html[data-theme="dark"] :is(button, input, textarea, select) {
+  color-scheme: dark;
+}
+
+html[data-theme="light"] :is(button, input, textarea, select) {
+  color-scheme: light;
+}
+
+/* Keep browser autofill from overriding the app's themed field surfaces. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+input:-moz-autofill {
+  color: var(--foreground);
+  caret-color: var(--foreground);
+  border-color: var(--border);
+  -webkit-text-fill-color: var(--foreground) !important;
+  box-shadow:
+    0 0 0 1000px var(--field-autofill-surface, var(--surface-raised)) inset !important;
+  -webkit-box-shadow:
+    0 0 0 1000px var(--field-autofill-surface, var(--surface-raised)) inset !important;
+  transition: background-color 99999s ease-out 0s;
 }
 
 ::selection {

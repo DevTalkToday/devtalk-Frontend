@@ -133,6 +133,7 @@ function MessagesContent() {
     [conversations, selectedId],
   );
   const selectedUser = selectedConversation?.user ?? null;
+  const canLoadSelectedConversation = selectedId != null && selectedConversation != null;
 
   const refreshConversations = useCallback(async () => {
     const data = (await FetchGetAuth("/messages/conversations")) as Conversation[];
@@ -211,7 +212,7 @@ function MessagesContent() {
   }, [refreshConversations]);
 
   useEffect(() => {
-    if (selectedId == null) {
+    if (!canLoadSelectedConversation) {
       setMessages([]);
       return;
     }
@@ -239,10 +240,10 @@ function MessagesContent() {
     return () => {
       alive = false;
     };
-  }, [selectedId, fetchConversationMessages, markConversationReadIfNeeded]);
+  }, [canLoadSelectedConversation, selectedId, fetchConversationMessages, markConversationReadIfNeeded]);
 
   useEffect(() => {
-    if (selectedId == null) return;
+    if (!canLoadSelectedConversation) return;
 
     let alive = true;
     const interval = window.setInterval(async () => {
@@ -263,7 +264,7 @@ function MessagesContent() {
       alive = false;
       window.clearInterval(interval);
     };
-  }, [selectedId, fetchConversationMessages, markConversationReadIfNeeded]);
+  }, [canLoadSelectedConversation, selectedId, fetchConversationMessages, markConversationReadIfNeeded]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });

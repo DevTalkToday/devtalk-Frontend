@@ -18,6 +18,7 @@ type FriendUser = {
   nickname: string;
   description: string | null;
   majors: string[];
+  avatarUrl: string | null;
 };
 
 type Friendship = {
@@ -78,6 +79,31 @@ function getDescription(user: FriendUser) {
   return user.description?.trim() || `@${user.username}`;
 }
 
+function ProfileAvatar({ user, size }: { user: FriendUser; size: "md" | "sm" }) {
+  const className = size === "md" ? "size-14 text-lg" : "size-12 text-base";
+
+  if (user.avatarUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={user.avatarUrl}
+        alt={`${user.nickname} 프로필`}
+        className={`${className} rounded-full border border-(--border) bg-(--surface-raised) object-cover`}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`grid ${className} place-items-center rounded-full font-bold text-white`}
+      style={{ backgroundColor: getAccent(user.id) }}
+      aria-label={`${user.nickname} 프로필`}
+    >
+      {user.nickname.slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
+
 function ProfileCard({
   friendship,
   tab,
@@ -96,13 +122,8 @@ function ProfileCard({
 
   return (
     <article className="grid gap-4 rounded-[24px] border border-(--border) bg-(--surface-raised) p-5 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
-      <Link
-        href={profileHref}
-        className="grid size-14 place-items-center rounded-full text-lg font-bold text-white"
-        style={{ backgroundColor: getAccent(person.id) }}
-        aria-label={`${person.nickname} 프로필`}
-      >
-        {person.nickname.slice(0, 1).toUpperCase()}
+      <Link href={profileHref} className="block">
+        <ProfileAvatar user={person} size="md" />
       </Link>
 
       <div className="min-w-0">
@@ -175,13 +196,8 @@ function SearchCard({
 
   return (
     <article className="grid gap-4 rounded-[20px] border border-(--border) bg-(--surface-raised) p-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
-      <Link
-        href={profileHref}
-        className="grid size-12 place-items-center rounded-full text-base font-bold text-white"
-        style={{ backgroundColor: getAccent(result.user.id) }}
-        aria-label={`${result.user.nickname} 프로필`}
-      >
-        {result.user.nickname.slice(0, 1).toUpperCase()}
+      <Link href={profileHref} className="block">
+        <ProfileAvatar user={result.user} size="sm" />
       </Link>
       <div className="min-w-0">
         <Link href={profileHref} className="font-semibold transition hover:text-(--accent)">

@@ -1,4 +1,4 @@
-export const POST_CATEGORIES = ["qna", "bug", "talk"] as const;
+export const POST_CATEGORIES = ["qna", "bug", "discussion", "talk"] as const;
 export const POST_SORT_OPTIONS = ["latest", "oldest", "popular", "views", "comments"] as const;
 export const POST_RESOLUTION_FILTERS = ["all", "resolved", "unresolved"] as const;
 export const BUG_STATUSES = ["open", "investigating", "fixed", "closed"] as const;
@@ -121,7 +121,8 @@ export type CommentAcceptPayload = {
 export const CATEGORY_LABELS: Record<PostCategory, string> = {
   qna: "해결 기록",
   bug: "도움 필요",
-  talk: "나만 보기 게시글",
+  discussion: "토론",
+  talk: "나만 보기",
 };
 
 export const SORT_LABELS: Record<PostSortOption, string> = {
