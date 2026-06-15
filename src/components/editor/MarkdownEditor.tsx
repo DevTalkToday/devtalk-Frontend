@@ -4,20 +4,11 @@ import { useDeferredValue, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { markdownComponents } from "@/components/devtalk/markdown-components";
+import { normalizeRenderableMarkdown, safeUrlTransform } from "@/lib/posts/render-markdown";
 
 type Props = {
   value: string;
   onChange: (next: string) => void;
-};
-
-const safeUrlTransform = (url: string) => {
-  try {
-    const parsed = new URL(url, "http://localhost");
-    if (["http:", "https:", "blob:", "data:"].includes(parsed.protocol)) return url;
-    return "";
-  } catch {
-    return "";
-  }
 };
 
 export default function MarkdownEditor({ value, onChange }: Props) {
@@ -110,7 +101,7 @@ export default function MarkdownEditor({ value, onChange }: Props) {
         {(mode === "preview" || mode === "split") && (
           <div className="min-h-[420px] w-full border-t border-(--border) px-5 py-5 md:border-l md:border-t-0">
             <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={safeUrlTransform} components={markdownComponents}>
-              {previewMarkdown}
+              {normalizeRenderableMarkdown(previewMarkdown)}
             </ReactMarkdown>
           </div>
         )}

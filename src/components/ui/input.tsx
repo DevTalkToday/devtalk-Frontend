@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode } from "react";
+import type { CSSProperties, InputHTMLAttributes, ReactNode } from "react";
 import { Field } from "./field";
 
 type SurfaceTone = "raised" | "base";
@@ -59,8 +59,15 @@ export const Input = ({
   inputClassName,
   tone = "raised",
   radius = "lg",
+  style,
   ...props
 }: Props) => {
+  const inputStyle = {
+    "--field-autofill-surface":
+      tone === "base" ? "var(--surface)" : "var(--surface-raised)",
+    ...style,
+  } as CSSProperties;
+
   return (
     <Field
       label={label}
@@ -78,6 +85,7 @@ export const Input = ({
         <input
           id={id}
           placeholder={props.placeholder ?? content}
+          style={inputStyle}
           className={textFieldClassName({
             tone,
             radius,

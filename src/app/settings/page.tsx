@@ -4,12 +4,13 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RequireLogin } from "@/components/auth/require-login";
 import { AppShell } from "@/components/devtalk/app-shell";
+import { ConstructionState } from "@/components/devtalk/construction-state";
 import { Button, Input } from "@/components/ui";
 import { FetchDeleteAuth, FetchGetAuth, FetchPatchAuth } from "@/lib/api/fetch";
 import { getAuthUser } from "@/lib/auth/session";
 import { showToast } from "@/lib/toast/events";
 
-type SettingsTab = "account" | "notifications" | "reports" | "users";
+type SettingsTab = "account" | "notifications" | "achievements" | "reports" | "users";
 type NotificationKind =
   | "POST_COMMENT"
   | "ADMIN_NOTICE"
@@ -68,6 +69,7 @@ const ADMIN_EMAIL = "s25002@gsm.hs.kr";
 const tabs: Array<{ id: SettingsTab; label: string; adminOnly?: boolean }> = [
   { id: "account", label: "계정 설정" },
   { id: "notifications", label: "알림 설정" },
+  { id: "achievements", label: "업적" },
   { id: "reports", label: "신고 관리", adminOnly: true },
   { id: "users", label: "유저 관리", adminOnly: true },
 ];
@@ -102,6 +104,7 @@ const notificationOptions: Array<{
 const titleByTab: Record<SettingsTab, string> = {
   account: "계정 설정",
   notifications: "알림 설정",
+  achievements: "업적",
   reports: "신고 관리",
   users: "유저 관리",
 };
@@ -109,6 +112,7 @@ const titleByTab: Record<SettingsTab, string> = {
 const summaryByTab: Record<SettingsTab, string> = {
   account: "로그인에 사용하는 비밀번호를 변경합니다.",
   notifications: "공지 외 알림 종류별 수신 여부를 조정합니다.",
+  achievements: "업적 달성 시 프로필에서 꾸밀 수 있는 스티커를 획득합니다.",
   reports: "접수된 신고 내용을 확인합니다.",
   users: "가입 유저를 확인하고 필요한 경우 삭제합니다.",
 };
@@ -143,6 +147,20 @@ const formatDateTime = (value?: string | null) => {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+};
+
+const getSafeNavigationHref = (value?: string | null) => {
+  if (!value) return null;
+  const normalized = value.trim();
+  if (!normalized || normalized.startsWith("//")) return null;
+  if (normalized.startsWith("/")) return normalized;
+
+  try {
+    const url = new URL(normalized);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
 };
 
 function ToggleSwitch({
@@ -391,8 +409,23 @@ function ReportManagement() {
                 대상: {report.targetLabel || report.targetId}
               </p>
             </div>
-            {report.targetUrl ? (
-              <a href={report.targetUrl} className="text-sm font-semibold text-(--accent) transition hover:underline">
+            {getSafeNavigationHref(report.targetUrl) ? (
+              <a
+                href={getSafeNavigationHref(report.targetUrl) ?? undefined}
+                className="text-sm font-semibold text-(--accent) transition hover:underline"
+                target={
+                  getSafeNavigationHref(report.targetUrl)?.startsWith("http://") ||
+                  getSafeNavigationHref(report.targetUrl)?.startsWith("https://")
+                    ? "_blank"
+                    : undefined
+                }
+                rel={
+                  getSafeNavigationHref(report.targetUrl)?.startsWith("http://") ||
+                  getSafeNavigationHref(report.targetUrl)?.startsWith("https://")
+                    ? "noreferrer noopener"
+                    : undefined
+                }
+              >
                 대상 열기
               </a>
             ) : null}
@@ -484,6 +517,10 @@ function UserManagement() {
   );
 }
 
+function AchievementSettings() {
+  return <ConstructionState fullPage={false} message="개발 중입니다." />;
+}
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("account");
   const localUser = asAuthUser(getAuthUser());
@@ -500,6 +537,7 @@ export default function SettingsPage() {
   const renderContent = () => {
     if (effectiveTab === "account") return <AccountSettings />;
     if (effectiveTab === "notifications") return <NotificationSettings />;
+    if (effectiveTab === "achievements") return <AchievementSettings />;
     if (effectiveTab === "reports" && admin) return <ReportManagement />;
     if (effectiveTab === "users" && admin) return <UserManagement />;
     return <AccountSettings />;
