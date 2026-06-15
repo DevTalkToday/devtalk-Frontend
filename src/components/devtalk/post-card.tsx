@@ -6,7 +6,8 @@ import { BookmarkIcon, CommentIcon, EyeIcon, HeartIcon } from "./icons";
 const getStatusLabel = (post: PostSummary) => {
   if (post.category === "qna") return "해결됨";
   if (post.category === "bug") return post.bug ? BUG_STATUS_LABELS[post.bug.status] : "열림";
-  return "기록 공유";
+  if (post.category === "discussion") return "모두 공개";
+  return "나만 보기";
 };
 
 export function PostCard({ post }: { post: PostSummary }) {
@@ -25,7 +26,9 @@ export function PostCard({ post }: { post: PostSummary }) {
               ? "border-(--border) bg-(--accent-soft) text-(--accent)"
               : post.category === "bug"
                 ? "border-(--bug-border) bg-(--bug-bg) text-(--bug-text)"
-                : "border-(--talk-border) bg-(--talk-bg) text-(--talk-text)",
+                : post.category === "discussion"
+                  ? "border-(--accent) bg-(--accent-soft) text-(--accent)"
+                  : "border-(--talk-border) bg-(--talk-bg) text-(--talk-text)",
           ].join(" ")}
         >
           {CATEGORY_LABELS[post.category]}

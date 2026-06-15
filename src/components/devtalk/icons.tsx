@@ -126,3 +126,35 @@ export function SparkIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function ListFormatIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="5.5" cy="7" r="1" fill="currentColor" stroke="none" />
+      <circle cx="5.5" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="5.5" cy="17" r="1" fill="currentColor" stroke="none" />
+      <path d="M9 7h10" />
+      <path d="M9 12h10" />
+      <path d="M9 17h10" />
+    </svg>
+  );
+}
+
+export function CodeBracketsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="m9 7-4 5 4 5" />
+      <path d="m15 7 4 5-4 5" />
+    </svg>
+  );
+}
+
+export function ChainLinkIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10.5 13.5 13.5 10.5" />
+      <path d="M8.5 8.5H7a3.5 3.5 0 1 0 0 7h1.5" />
+      <path d="M15.5 8.5H17a3.5 3.5 0 1 1 0 7h-1.5" />
+    </svg>
+  );
+}
