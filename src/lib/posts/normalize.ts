@@ -76,7 +76,12 @@ const buildBugMeta = (body: UnknownRecord, existing?: BugMeta): BugPayload => {
 };
 
 export const createExcerpt = (content: string) =>
-  content.replace(/\s+/g, " ").trim().slice(0, 150);
+  content
+    .replace(/!\[[^\]]*]\([^\)]*\)/g, " ")
+    .replace(/\[([^\]]+)]\([^\)]*\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 150);
 
 export const normalizePostPayload = (body: unknown, existing?: PostDetail): PostPayload => {
   const record = asRecord(body);

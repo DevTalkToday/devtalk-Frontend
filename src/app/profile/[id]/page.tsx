@@ -5,9 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/devtalk/app-shell";
+import { CommentActionsMenu } from "@/components/devtalk/comment-actions-menu";
 import { PostCard } from "@/components/devtalk/post-card";
-import { ReportButton } from "@/components/devtalk/report-dialog";
-import { FetchGet } from "@/lib/api/fetch";
+import { ReportButton, ReportDialog } from "@/components/devtalk/report-dialog";
+import { FetchDeleteAuth, FetchGet, FetchGetAuth, FetchPostAuth } from "@/lib/api/fetch";
 import { getAuthUser, useAuthStatus } from "@/lib/auth/session";
 import { CATEGORY_LABELS, type PostCategory, type PostSummary } from "@/lib/posts/types";
 
@@ -22,11 +23,18 @@ type PublicProfileUser = {
   createdAt: string;
 };
 
+type FriendRelationship = "NONE" | "FRIEND" | "SENT" | "RECEIVED";
+
 type PublicProfileResponse = {
   user: PublicProfileUser;
   postCount: number;
   commentCount: number;
   acceptedCommentCount: number;
+  followerCount: number;
+  followingCount: number;
+  viewerFriendshipStatus: FriendRelationship;
+  viewerFriendshipId: number | null;
+  viewerFollowing: boolean;
 };
 
 type PostsResponse = {
@@ -47,6 +55,14 @@ type CommentsResponse = {
   items: ProfileComment[];
 };
 
+type FriendSearchResult = {
+  user: {
+    id: number | string;
+  };
+  relationship: FriendRelationship;
+  friendshipId: number | null;
+};
+
 type ProfileTab = "posts" | "comments";
 
 type AuthUser = {
@@ -57,6 +73,13 @@ const tabs: Array<{ id: ProfileTab; label: string }> = [
   { id: "posts", label: "게시글" },
   { id: "comments", label: "댓글" },
 ];
+
+const friendButtonLabel: Record<FriendRelationship, string> = {
+  NONE: "친구 추가",
+  FRIEND: "친구",
+  SENT: "보냄",
+  RECEIVED: "친구 수락",
+};
 
 const formatDate = (value?: string | null) => {
   if (!value) return "가입일 정보 없음";
@@ -93,7 +116,14 @@ export default function PublicProfilePage() {
   const router = useRouter();
   const { ready, loggedIn } = useAuthStatus();
   const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
+  const [friendBusy, setFriendBusy] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const authUser = useMemo(() => (ready && loggedIn ? asAuthUser(getAuthUser()) : null), [ready, loggedIn]);
+  const targetUserId = useMemo(() => {
+    const parsed = Number(id);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [id]);
   const isOwnProfile = Boolean(id && authUser?.id != null && String(authUser.id) === String(id));
 
   useEffect(() => {
@@ -103,9 +133,10 @@ export default function PublicProfilePage() {
   }, [isOwnProfile, router]);
 
   const profileQuery = useQuery({
-    queryKey: ["profile", id],
-    enabled: Boolean(id) && !isOwnProfile,
-    queryFn: () => FetchGet(`/profile/${id}`) as Promise<PublicProfileResponse>,
+    queryKey: ["profile", id, ready && loggedIn ? "auth" : "guest"],
+    enabled: Boolean(id) && !isOwnProfile && ready,
+    queryFn: () =>
+      ((loggedIn ? FetchGetAuth(`/profile/${id}`) : FetchGet(`/profile/${id}`)) as Promise<PublicProfileResponse>),
   });
 
   const postsQuery = useQuery({
@@ -123,12 +154,73 @@ export default function PublicProfilePage() {
   const profile = profileQuery.data;
   const user = profile?.user;
   const nickname = user?.nickname?.trim() || "사용자";
-  const description = user?.description?.trim() || "아직 등록된 설명이 없습니다.";
+  const description = user?.description?.trim() || "아직 등록된 소개가 없습니다.";
   const majors = useMemo(() => user?.majors?.filter(Boolean) ?? [], [user?.majors]);
+  const relationshipLookupKeyword = useMemo(() => {
+    const candidates = [user?.email, user?.username, user?.nickname]
+      .map((value) => value?.trim() || "")
+      .filter((value) => value.length >= 2);
+
+    return candidates[0] ?? "";
+  }, [user?.email, user?.nickname, user?.username]);
   const profileIdentifier = user ? getProfileIdentifier(user) : "";
   const avatarInitial = nickname.slice(0, 1).toUpperCase() || "U";
   const posts = postsQuery.data?.items ?? [];
   const comments = commentsQuery.data?.items ?? [];
+  const profilePending = !ready || profileQuery.isLoading;
+  const profileMissing = ready && !profilePending && (profileQuery.isError || !user);
+  const publicProfile = profilePending || profileMissing ? null : profile;
+  const relationshipQuery = useQuery({
+    queryKey: ["profile", id, "relationship", relationshipLookupKeyword],
+    enabled: Boolean(targetUserId) && loggedIn && !isOwnProfile && relationshipLookupKeyword.length >= 2,
+    queryFn: async () => {
+      const results = (await FetchGetAuth(`/friends/search?q=${encodeURIComponent(relationshipLookupKeyword)}`)) as FriendSearchResult[];
+      return results.find((entry) => String(entry.user.id) === String(targetUserId)) ?? null;
+    },
+  });
+  const friendshipStatus = relationshipQuery.data?.relationship ?? profile?.viewerFriendshipStatus ?? "NONE";
+  const following = publicProfile?.viewerFollowing ?? false;
+  const followerCount = publicProfile?.followerCount ?? 0;
+  const followingCount = publicProfile?.followingCount ?? 0;
+
+  const requireLoginForAction = () => {
+    if (!ready) return true;
+    if (loggedIn) return false;
+    router.push("/login");
+    return true;
+  };
+
+  const handleFriendAction = async () => {
+    if (!targetUserId || friendBusy) return;
+    if (friendshipStatus === "FRIEND" || friendshipStatus === "SENT") return;
+    if (requireLoginForAction()) return;
+
+    setFriendBusy(true);
+    try {
+      await FetchPostAuth("/friends/requests", { userId: targetUserId });
+      await profileQuery.refetch();
+      await relationshipQuery.refetch();
+    } finally {
+      setFriendBusy(false);
+    }
+  };
+
+  const handleFollowAction = async () => {
+    if (!targetUserId || followBusy) return;
+    if (requireLoginForAction()) return;
+
+    setFollowBusy(true);
+    try {
+      if (following) {
+        await FetchDeleteAuth(`/profile/${targetUserId}/follow`);
+      } else {
+        await FetchPostAuth(`/profile/${targetUserId}/follow`);
+      }
+      await profileQuery.refetch();
+    } finally {
+      setFollowBusy(false);
+    }
+  };
 
   if (isOwnProfile) {
     return (
@@ -142,13 +234,13 @@ export default function PublicProfilePage() {
 
   return (
     <AppShell showPageHeader={false}>
-      {profileQuery.isLoading ? (
+      {profilePending ? (
         <section className="rounded-[28px] border border-(--border) bg-(--surface) p-6 text-sm text-(--muted-strong) shadow-(--shadow)">
           프로필을 불러오는 중입니다.
         </section>
       ) : null}
 
-      {profileQuery.isError || !user ? (
+      {profilePending ? null : profileMissing ? (
         <section className="rounded-[28px] border border-(--border) bg-(--surface) p-6 text-sm text-(--danger) shadow-(--shadow)">
           프로필을 찾지 못했습니다.
         </section>
@@ -156,10 +248,10 @@ export default function PublicProfilePage() {
         <div className="grid gap-6">
           <section className="grid gap-6 rounded-[28px] border border-(--border) bg-(--surface) p-6 shadow-(--shadow) backdrop-blur-[18px] lg:grid-cols-[180px_minmax(0,1fr)] lg:items-center">
             <div className="flex justify-center lg:justify-start">
-              {user.avatarUrl ? (
+              {user!.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={user.avatarUrl}
+                  src={user!.avatarUrl}
                   alt={`${nickname} 프로필 이미지`}
                   className="size-36 rounded-full border border-(--border) bg-(--surface-raised) object-cover shadow-(--shadow)"
                 />
@@ -176,29 +268,52 @@ export default function PublicProfilePage() {
                   <h1 className="break-words text-3xl font-semibold md:text-4xl">{nickname}</h1>
                   {profileIdentifier ? <p className="mt-2 break-words text-sm text-(--muted-strong)">{profileIdentifier}</p> : null}
                 </div>
-                <ReportButton
-                  size="sm"
-                  target={{
-                    type: "profile",
-                    id: user.id,
-                    label: `${nickname} 프로필`,
-                    url: `/profile/${user.id}`,
-                  }}
-                />
+
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <CommentActionsMenu
+                    items={[
+                      {
+                        label: friendBusy ? "친구 처리 중..." : friendButtonLabel[friendshipStatus],
+                        tone: friendshipStatus === "NONE" || friendshipStatus === "RECEIVED" ? "accent" : "default",
+                        disabled: friendBusy || friendshipStatus === "FRIEND" || friendshipStatus === "SENT",
+                        onSelect: handleFriendAction,
+                      },
+                      {
+                        label: followBusy ? "팔로우 처리 중..." : following ? "팔로잉" : "팔로우",
+                        tone: following ? "accent" : "default",
+                        disabled: followBusy,
+                        onSelect: handleFollowAction,
+                      },
+                      {
+                        label: "신고하기",
+                        tone: "danger",
+                        onSelect: () => setReportOpen(true),
+                      },
+                    ]}
+                  />
+                </div>
               </div>
 
-              <dl className="grid gap-3 sm:grid-cols-3">
+              <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <div className="rounded-2xl border border-(--border) bg-(--surface-raised) p-4">
                   <dt className="text-xs font-bold text-(--muted)">게시글</dt>
-                  <dd className="mt-2 text-sm font-semibold">{profile.postCount}</dd>
+                  <dd className="mt-2 text-sm font-semibold">{publicProfile!.postCount}</dd>
                 </div>
                 <div className="rounded-2xl border border-(--border) bg-(--surface-raised) p-4">
                   <dt className="text-xs font-bold text-(--muted)">댓글</dt>
-                  <dd className="mt-2 text-sm font-semibold">{profile.commentCount}</dd>
+                  <dd className="mt-2 text-sm font-semibold">{publicProfile!.commentCount}</dd>
+                </div>
+                <div className="rounded-2xl border border-(--border) bg-(--surface-raised) p-4">
+                  <dt className="text-xs font-bold text-(--muted)">팔로워</dt>
+                  <dd className="mt-2 text-sm font-semibold">{followerCount}</dd>
+                </div>
+                <div className="rounded-2xl border border-(--border) bg-(--surface-raised) p-4">
+                  <dt className="text-xs font-bold text-(--muted)">팔로잉</dt>
+                  <dd className="mt-2 text-sm font-semibold">{followingCount}</dd>
                 </div>
                 <div className="rounded-2xl border border-(--border) bg-(--surface-raised) p-4">
                   <dt className="text-xs font-bold text-(--muted)">가입일</dt>
-                  <dd className="mt-2 text-sm font-semibold">{formatDate(user.createdAt)}</dd>
+                  <dd className="mt-2 text-sm font-semibold">{formatDate(user!.createdAt)}</dd>
                 </div>
               </dl>
 
@@ -251,9 +366,7 @@ export default function PublicProfilePage() {
                   {!postsQuery.isLoading && !postsQuery.isError && posts.length === 0 ? (
                     <p className="text-sm text-(--muted-strong)">작성한 게시글이 없습니다.</p>
                   ) : null}
-                  {!postsQuery.isLoading && !postsQuery.isError
-                    ? posts.map((post) => <PostCard key={post.id} post={post} />)
-                    : null}
+                  {!postsQuery.isLoading && !postsQuery.isError ? posts.map((post) => <PostCard key={post.id} post={post} />) : null}
                 </div>
               ) : (
                 <div className="grid gap-3">
@@ -283,7 +396,7 @@ export default function PublicProfilePage() {
                                 target={{
                                   type: "comment",
                                   id: comment.id,
-                                  label: `${nickname}님의 댓글: ${comment.body.trim().replace(/\s+/g, " ").slice(0, 60)}`,
+                                  label: `${nickname}의 댓글: ${comment.body.trim().replace(/\s+/g, " ").slice(0, 60)}`,
                                   url: comment.targetUrl,
                                 }}
                               />
@@ -298,6 +411,17 @@ export default function PublicProfilePage() {
               )}
             </div>
           </section>
+
+          <ReportDialog
+            target={{
+              type: "profile",
+              id: user!.id,
+              label: `${nickname} 프로필`,
+              url: `/profile/${user!.id}`,
+            }}
+            open={reportOpen}
+            onOpenChange={setReportOpen}
+          />
         </div>
       )}
     </AppShell>
