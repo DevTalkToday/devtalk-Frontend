@@ -33,43 +33,33 @@ const isAbsoluteUrl = (value: string | undefined) => Boolean(value && ABSOLUTE_U
 
 const unique = <T,>(values: T[]) => Array.from(new Set(values));
 
-const shouldUseInternalBackendProxy = (request: NextRequest) => {
-  const hostname = request.nextUrl.hostname.toLowerCase();
-  return hostname !== "localhost"
-    && hostname !== "127.0.0.1"
-    && hostname !== "[::1]"
-    && !hostname.endsWith(".vercel.app");
-};
+const isVercelRuntime = () => process.env.VERCEL === "1";
 
-const getDefaultProxyCandidates = (request: NextRequest) => {
-  const candidates: string[] = [];
-
-  if (shouldUseInternalBackendProxy(request)) {
-    candidates.push("http://backend:4000");
+const isAllowedProxyCandidate = (candidate: string, request: NextRequest) => {
+  try {
+    const targetUrl = new URL(candidate);
+    if (targetUrl.origin === request.nextUrl.origin && targetUrl.pathname.startsWith("/api")) {
+      return false;
+    }
+    return !(isVercelRuntime() && targetUrl.hostname === "backend");
+  } catch {
+    return false;
   }
-
-  candidates.push("http://ssh.gsmsv.site:25124/api");
-  return candidates;
 };
+
+const getDefaultProxyCandidates = () => [
+  "http://ssh.gsmsv.site:25124/api",
+];
 
 const resolveProxyBaseUrls = (request: NextRequest) => {
   const candidates = [
     process.env.API_PROXY_TARGET,
-    process.env.NEXT_PUBLIC_API_URL,
-    process.env.NEXT_PUBLIC_API_BASE_URL,
-    ...getDefaultProxyCandidates(request),
+    ...getDefaultProxyCandidates(),
   ]
     .map((value) => value?.trim() ?? "")
     .filter(isAbsoluteUrl)
     .map(trimTrailingSlashes)
-    .filter((candidate) => {
-      try {
-        const targetUrl = new URL(candidate);
-        return !(targetUrl.origin === request.nextUrl.origin && targetUrl.pathname.startsWith("/api"));
-      } catch {
-        return false;
-      }
-    });
+    .filter((candidate) => isAllowedProxyCandidate(candidate, request));
 
   return unique(candidates);
 };
