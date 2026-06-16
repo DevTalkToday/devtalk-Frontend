@@ -34,6 +34,11 @@ const isAbsoluteUrl = (value: string | undefined) => Boolean(value && ABSOLUTE_U
 const unique = <T,>(values: T[]) => Array.from(new Set(values));
 
 const isVercelRuntime = () => process.env.VERCEL === "1";
+const VM_API_HOSTNAME = "ssh.gsmsv.site";
+const BLOCKED_PROXY_HOSTNAMES = new Set(["backend", "devtalk.kr", "www.devtalk.kr"]);
+
+const isVercelRequest = (request: NextRequest) =>
+  isVercelRuntime() || request.nextUrl.hostname.endsWith(".vercel.app");
 
 const isAllowedProxyCandidate = (candidate: string, request: NextRequest) => {
   try {
@@ -41,14 +46,17 @@ const isAllowedProxyCandidate = (candidate: string, request: NextRequest) => {
     if (targetUrl.origin === request.nextUrl.origin && targetUrl.pathname.startsWith("/api")) {
       return false;
     }
-    return !(isVercelRuntime() && targetUrl.hostname === "backend");
+    if (BLOCKED_PROXY_HOSTNAMES.has(targetUrl.hostname)) {
+      return false;
+    }
+    return !isVercelRequest(request) || targetUrl.hostname === VM_API_HOSTNAME;
   } catch {
     return false;
   }
 };
 
 const getDefaultProxyCandidates = () => [
-  "http://ssh.gsmsv.site:25124/api",
+  `http://${VM_API_HOSTNAME}:25124/api`,
 ];
 
 const resolveProxyBaseUrls = (request: NextRequest) => {
