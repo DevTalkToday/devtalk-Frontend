@@ -68,8 +68,8 @@ const tabs: Array<{ id: ProfileTab; label: string }> = [
 
 const friendButtonLabel: Record<FriendRelationship, string> = {
   NONE: "친구 추가",
-  FRIEND: "친구(친추 불가)",
-  SENT: "보냄(친추 불가)",
+  FRIEND: "친구",
+  SENT: "보냄",
   RECEIVED: "친구 수락",
 };
 
