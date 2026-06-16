@@ -33,6 +33,23 @@ const isAbsoluteUrl = (value: string | undefined) => Boolean(value && ABSOLUTE_U
 
 const unique = <T,>(values: T[]) => Array.from(new Set(values));
 
+const isVercelRuntime = () => process.env.VERCEL === "1";
+
+const canUseProxyCandidate = (candidate: string, request: NextRequest) => {
+  try {
+    const targetUrl = new URL(candidate);
+    if (targetUrl.origin === request.nextUrl.origin && targetUrl.pathname.startsWith("/api")) {
+      return false;
+    }
+    if (isVercelRuntime() && targetUrl.hostname === "backend") {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const getDefaultProxyCandidates = () => [
   "http://ssh.gsmsv.site:25124/api",
 ];
@@ -47,14 +64,7 @@ const resolveProxyBaseUrls = (request: NextRequest) => {
     .map((value) => value?.trim() ?? "")
     .filter(isAbsoluteUrl)
     .map(trimTrailingSlashes)
-    .filter((candidate) => {
-      try {
-        const targetUrl = new URL(candidate);
-        return !(targetUrl.origin === request.nextUrl.origin && targetUrl.pathname.startsWith("/api"));
-      } catch {
-        return false;
-      }
-    });
+    .filter((candidate) => canUseProxyCandidate(candidate, request));
 
   return unique(candidates);
 };
