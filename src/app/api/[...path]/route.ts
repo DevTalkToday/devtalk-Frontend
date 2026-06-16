@@ -26,6 +26,8 @@ const ABSOLUTE_URL_PATTERN = /^https?:\/\//i;
 const IDEMPOTENT_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RETRIABLE_UPSTREAM_STATUSES = new Set([404, 502, 503, 504]);
 const UPSTREAM_FETCH_TIMEOUT_MS = 8000;
+const VM_API_BASE_URL = "http://ssh.gsmsv.site:25124/api";
+const SELF_PROXY_HOSTS = new Set(["devtalk.kr", "www.devtalk.kr"]);
 
 const trimTrailingSlashes = (value: string) => value.replace(/\/+$/, "");
 
@@ -38,6 +40,20 @@ const isVercelRuntime = () => process.env.VERCEL === "1";
 const canUseProxyCandidate = (candidate: string, request: NextRequest) => {
   try {
     const targetUrl = new URL(candidate);
+    const requestHosts = [
+      request.nextUrl.hostname,
+      request.headers.get("host"),
+      request.headers.get("x-forwarded-host"),
+    ]
+      .filter(Boolean)
+      .map((host) => host!.split(":")[0].toLowerCase());
+
+    if (SELF_PROXY_HOSTS.has(targetUrl.hostname.toLowerCase())) {
+      return false;
+    }
+    if (requestHosts.includes(targetUrl.hostname.toLowerCase())) {
+      return false;
+    }
     if (targetUrl.origin === request.nextUrl.origin && targetUrl.pathname.startsWith("/api")) {
       return false;
     }
@@ -50,17 +66,17 @@ const canUseProxyCandidate = (candidate: string, request: NextRequest) => {
   }
 };
 
-const getDefaultProxyCandidates = () => [
-  "http://ssh.gsmsv.site:25124/api",
-];
+const getProxyCandidates = () => {
+  const apiProxyTarget = process.env.API_PROXY_TARGET;
+  if (isVercelRuntime()) {
+    return [VM_API_BASE_URL, apiProxyTarget];
+  }
+
+  return [apiProxyTarget, VM_API_BASE_URL];
+};
 
 const resolveProxyBaseUrls = (request: NextRequest) => {
-  const candidates = [
-    process.env.API_PROXY_TARGET,
-    process.env.NEXT_PUBLIC_API_URL,
-    process.env.NEXT_PUBLIC_API_BASE_URL,
-    ...getDefaultProxyCandidates(),
-  ]
+  const candidates = getProxyCandidates()
     .map((value) => value?.trim() ?? "")
     .filter(isAbsoluteUrl)
     .map(trimTrailingSlashes)
@@ -139,6 +155,7 @@ const handle = async (request: NextRequest, context: RouteContext) => {
         statusText: upstreamResponse.statusText,
         headers: copyResponseHeaders(upstreamResponse),
       });
+      proxiedResponse.headers.set("x-devtalk-api-upstream", new URL(upstreamUrl).origin);
 
       const canRetryOnNotFound = hasNextCandidate && upstreamResponse.status === 404;
       const canRetryIdempotentError =
