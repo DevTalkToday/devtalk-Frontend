@@ -1,0 +1,123 @@
+name: Deploy Frontend To VM
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-frontend-vm
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check VM deployment secrets
+        id: vm-secrets
+        env:
+          VM_KNOWN_HOSTS: ${{ secrets.VM_KNOWN_HOSTS }}
+          VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_PORT: ${{ secrets.VM_PORT }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${VM_KNOWN_HOSTS}" || -z "${VM_SSH_KEY}" || -z "${VM_HOST}" || -z "${VM_PORT}" || -z "${VM_USER}" ]]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "VM deployment secrets are not configured in this repository; skipping VM deploy."
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure SSH
+        if: steps.vm-secrets.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.VM_KNOWN_HOSTS }}" | tr -d '\r' > ~/.ssh/known_hosts
+          printf '%s\n' "${{ secrets.VM_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/known_hosts ~/.ssh/id_ed25519
+          if ! ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null 2>&1; then
+            echo "VM_SSH_KEY secret is invalid. Paste the exact contents of ~/.ssh/devtalk_vm_deploy and use a key without a passphrase."
+            exit 1
+          fi
+
+      - name: Deploy on VM
+        if: steps.vm-secrets.outputs.available == 'true'
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_PORT: ${{ secrets.VM_PORT }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o ConnectTimeout=15 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p "$VM_PORT" "$VM_USER@$VM_HOST" <<'EOF'
+          set -euo pipefail
+          heartbeat() {
+            while true; do
+              echo "[deploy] still running $(date '+%Y-%m-%dT%H:%M:%S%z')"
+              sleep 30
+            done
+          }
+          heartbeat &
+          heartbeat_pid=$!
+          trap 'kill "$heartbeat_pid" >/dev/null 2>&1 || true' EXIT
+
+          mkdir -p ~/devtalk
+          if ! git -C ~/devtalk/devtalk-frontend rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            echo "[deploy] cloning frontend repository"
+            rm -rf ~/devtalk/devtalk-frontend
+            git clone https://github.com/DevTalkToday/devtalk-Frontend.git ~/devtalk/devtalk-frontend
+          fi
+
+          echo "[deploy] updating frontend repository"
+          frontend_repo_root="$HOME/devtalk/devtalk-frontend"
+          git -C "$frontend_repo_root" -c safe.directory="$frontend_repo_root" remote set-url origin https://github.com/DevTalkToday/devtalk-Frontend.git
+          git -C "$frontend_repo_root" -c safe.directory="$frontend_repo_root" fetch origin main
+          git -C "$frontend_repo_root" -c safe.directory="$frontend_repo_root" reset --hard origin/main
+          git -C "$frontend_repo_root" -c safe.directory="$frontend_repo_root" clean -fd
+
+          cd ~/devtalk/deploy/gsmsv
+          if [[ ! -f .env ]]; then
+            echo "Missing deploy/gsmsv/.env"
+            exit 1
+          fi
+
+          echo "[deploy] rebuilding frontend"
+          docker compose up -d --build frontend
+          echo "[deploy] ensuring nginx stays up"
+          docker compose up -d --no-build nginx
+
+          verified=0
+          for attempt in 1 2 3 4 5 6; do
+            if docker compose exec -T frontend node -e "fetch('http://127.0.0.1:3000').then((res) => { console.log(res.status); process.exit(res.ok ? 0 : 1); }).catch((error) => { console.error(error); process.exit(1); })" \
+              && docker compose exec -T frontend node -e "const started = Date.now(); fetch('http://127.0.0.1:3000/api/health').then(async (res) => { console.log(res.status, Date.now() - started); console.log(await res.text()); process.exit(res.ok ? 0 : 1); }).catch((error) => { console.error(error); process.exit(1); })" \
+              && docker compose exec -T nginx wget -qO- http://127.0.0.1/api/health > /dev/null \
+              && docker compose exec -T nginx wget -qO- http://backend:4000/health > /dev/null; then
+              verified=1
+              break
+            fi
+
+            if [ "$attempt" -lt 6 ]; then
+              echo "verify attempt $attempt failed, retrying in 5s..."
+              sleep 5
+            fi
+          done
+
+          if [ "$verified" -eq 1 ]; then
+            echo "Deployment verification succeeded."
+          else
+            echo "Deployment verification failed after retries."
+            docker compose ps || true
+            docker compose logs --tail=120 frontend || true
+            docker compose logs --tail=120 backend || true
+            docker compose logs --tail=120 nginx || true
+            exit 1
+          fi
+
+          kill "$heartbeat_pid" >/dev/null 2>&1 || true
+          trap - EXIT
+          EOF
