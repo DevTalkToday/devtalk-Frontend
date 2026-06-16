@@ -106,7 +106,7 @@ const handle = async (request: NextRequest, context: RouteContext) => {
   const { path = [] } = await context.params;
   const headers = copyRequestHeaders(request);
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer();
-  const canRetry = IDEMPOTENT_METHODS.has(request.method);
+  const canRetryIdempotent = IDEMPOTENT_METHODS.has(request.method);
   let lastErrorResponse: NextResponse | null = null;
 
   for (const [index, proxyBaseUrl] of proxyBaseUrls.entries()) {
@@ -126,18 +126,21 @@ const handle = async (request: NextRequest, context: RouteContext) => {
         headers: copyResponseHeaders(upstreamResponse),
       });
 
-      if (
-        canRetry &&
-        index < proxyBaseUrls.length - 1 &&
-        RETRIABLE_UPSTREAM_STATUSES.has(upstreamResponse.status)
-      ) {
+      const hasNextCandidate = index < proxyBaseUrls.length - 1;
+      const canRetryOnNotFound = hasNextCandidate && upstreamResponse.status === 404;
+      const canRetryIdempotentError =
+        canRetryIdempotent &&
+        hasNextCandidate &&
+        RETRIABLE_UPSTREAM_STATUSES.has(upstreamResponse.status);
+
+      if (canRetryOnNotFound || canRetryIdempotentError) {
         lastErrorResponse = proxiedResponse;
         continue;
       }
 
       return proxiedResponse;
     } catch {
-      if (canRetry && index < proxyBaseUrls.length - 1) {
+      if (canRetryIdempotent && index < proxyBaseUrls.length - 1) {
         continue;
       }
 
