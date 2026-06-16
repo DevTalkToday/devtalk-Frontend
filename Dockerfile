@@ -29,9 +29,12 @@ RUN pnpm build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
+ARG API_PROXY_TARGET=http://backend:4000
+
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
+ENV API_PROXY_TARGET=$API_PROXY_TARGET
 
 COPY --from=build /app/public ./public
 COPY --from=build /app/.next/standalone ./
