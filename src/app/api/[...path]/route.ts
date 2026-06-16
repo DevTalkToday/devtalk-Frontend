@@ -48,7 +48,7 @@ const getDefaultProxyCandidates = (request: NextRequest) => {
     candidates.push("http://backend:4000");
   }
 
-  candidates.push("http://ssh.gsmsv.site:25124/api", "https://devtalk.kr/api");
+  candidates.push("http://ssh.gsmsv.site:25124/api");
   return candidates;
 };
 
