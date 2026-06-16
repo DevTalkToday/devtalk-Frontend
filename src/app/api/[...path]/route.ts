@@ -33,31 +33,16 @@ const isAbsoluteUrl = (value: string | undefined) => Boolean(value && ABSOLUTE_U
 
 const unique = <T,>(values: T[]) => Array.from(new Set(values));
 
-const shouldUseInternalBackendProxy = (request: NextRequest) => {
-  const hostname = request.nextUrl.hostname.toLowerCase();
-  return hostname !== "localhost"
-    && hostname !== "127.0.0.1"
-    && hostname !== "[::1]"
-    && !hostname.endsWith(".vercel.app");
-};
-
-const getDefaultProxyCandidates = (request: NextRequest) => {
-  const candidates: string[] = [];
-
-  if (shouldUseInternalBackendProxy(request)) {
-    candidates.push("http://backend:4000");
-  }
-
-  candidates.push("http://ssh.gsmsv.site:25124/api");
-  return candidates;
-};
+const getDefaultProxyCandidates = () => [
+  "http://ssh.gsmsv.site:25124/api",
+];
 
 const resolveProxyBaseUrls = (request: NextRequest) => {
   const candidates = [
     process.env.API_PROXY_TARGET,
     process.env.NEXT_PUBLIC_API_URL,
     process.env.NEXT_PUBLIC_API_BASE_URL,
-    ...getDefaultProxyCandidates(request),
+    ...getDefaultProxyCandidates(),
   ]
     .map((value) => value?.trim() ?? "")
     .filter(isAbsoluteUrl)
