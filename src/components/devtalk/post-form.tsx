@@ -1,11 +1,10 @@
 "use client";
 
-import { KeyboardEvent, startTransition, useState } from "react";
+import { startTransition, useState } from "react";
 import { useRouter } from "next/navigation";
-import { TrashIcon } from "@/components/devtalk/icons";
 import MajorMultiSelect from "@/components/MajorMultiSelect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
-import { Button, ChipGroup, Field, Input, InputAction, Textarea } from "@/components/ui";
+import { Button, ChipGroup, Field, Input, Textarea } from "@/components/ui";
 import { FetchPostAuth, FetchPutAuth } from "@/lib/api/fetch";
 import { isKnownMajorValue, normalizeMajorValues } from "@/lib/majors/normalize";
 import { BUG_STATUS_LABELS, CATEGORY_LABELS, type BugStatus, type PostCategory, type PostDetail } from "@/lib/posts/types";
@@ -20,11 +19,9 @@ type Props = {
 type FormState = {
   title: string;
   category: PostCategory;
-  tags: string[];
-  tagInput: string;
+  tagsText: string;
   majors: string[];
-  customMajors: string[];
-  customMajorInput: string;
+  customMajorsText: string;
   content: string;
   questionExpected: string;
   questionActual: string;
@@ -37,26 +34,18 @@ type FormState = {
 
 const BUG_STATUS_FORM_OPTIONS: BugStatus[] = ["open", "fixed", "closed"];
 const MAX_MAJOR_COUNT = 3;
-const MAX_TAG_COUNT = 8;
 const CUSTOM_MAJOR_BUTTON_LABEL = "기타 입력";
 const CUSTOM_MAJOR_PLACEHOLDER = "직접 입력";
-const CUSTOM_MAJOR_HINT = "기타 직무/영역은 하나씩 추가되며, 선택 항목을 포함해 최대 3개까지 저장됩니다.";
+const CUSTOM_MAJOR_HINT = "쉼표로 구분해 입력할 수 있으며, 선택 항목을 포함해 최대 3개까지 저장됩니다.";
 const CUSTOM_MAJOR_MAX_LENGTH = 80;
-const TAG_PLACEHOLDER = "예: nextjs";
-const TAG_HINT = "태그는 하나씩 추가되며 최대 8개까지 저장됩니다.";
 
-const normalizeToken = (value: string) => value.trim().replace(/^#/, "");
+const toCsv = (items: string[]) => items.join(", ");
 
-const dedupeTokens = (values: string[]) => {
-  const seen = new Set<string>();
-
-  return values.filter((value) => {
-    const normalized = normalizeToken(value).toLowerCase();
-    if (!normalized || seen.has(normalized)) return false;
-    seen.add(normalized);
-    return true;
-  });
-};
+const fromCsv = (value: string) =>
+  value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 
 const fromLines = (value: string) =>
   value
@@ -69,7 +58,7 @@ const splitInitialMajors = (values: string[]) => {
 
   return {
     selectedMajors: normalized.filter(isKnownMajorValue),
-    customMajors: normalized.filter((value) => !isKnownMajorValue(value)),
+    customMajorsText: toCsv(normalized.filter((value) => !isKnownMajorValue(value))),
   };
 };
 
@@ -79,11 +68,9 @@ const createInitialState = (post?: PostDetail): FormState => {
   return {
     title: post?.title ?? "",
     category: post?.category ?? "bug",
-    tags: dedupeTokens(post?.tags ?? []).slice(0, MAX_TAG_COUNT),
-    tagInput: "",
+    tagsText: toCsv(post?.tags ?? []),
     majors: initialMajors.selectedMajors,
-    customMajors: initialMajors.customMajors,
-    customMajorInput: "",
+    customMajorsText: initialMajors.customMajorsText,
     content: post?.content ?? "",
     questionExpected: post?.question?.expected ?? "",
     questionActual: post?.question?.actual ?? "",
@@ -109,66 +96,23 @@ const copyQuestionFieldsToBug = (form: FormState): FormState => ({
   bugSteps: form.questionSteps,
 });
 
-function TokenList({
-  values,
-  prefix,
-  onRemove,
-}: {
-  values: string[];
-  prefix?: string;
-  onRemove: (value: string) => void;
-}) {
-  if (values.length === 0) return null;
-
-  return (
-    <div className="mt-3 flex flex-wrap gap-2">
-      {values.map((value) => (
-        <span
-          key={value}
-          className="inline-flex items-center gap-2 rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1.5 text-xs font-semibold text-(--muted-strong)"
-        >
-          <span>
-            {prefix}
-            {value}
-          </span>
-          <button
-            type="button"
-            aria-label={`${value} 제거`}
-            onClick={() => onRemove(value)}
-            className="grid size-5 place-items-center rounded-full text-(--muted-strong) transition hover:bg-(--surface-raised) hover:text-(--danger)"
-          >
-            <TrashIcon className="size-3" />
-          </button>
-        </span>
-      ))}
-    </div>
-  );
-}
-
 export function PostForm({ mode, postId, initialPost }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => createInitialState(initialPost));
   const [showCustomMajorInput, setShowCustomMajorInput] = useState(
-    () => splitInitialMajors(initialPost?.majors ?? []).customMajors.length > 0,
+    () => splitInitialMajors(initialPost?.majors ?? []).customMajorsText.length > 0,
   );
   const [submitting, setSubmitting] = useState(false);
 
-  const selectedMajors = normalizeMajorValues([...form.majors, ...form.customMajors], MAX_MAJOR_COUNT);
-  const customMajorSelected = showCustomMajorInput || form.customMajors.length > 0;
+  const customMajors = fromCsv(form.customMajorsText);
+  const selectedMajors = normalizeMajorValues([...form.majors, ...customMajors], MAX_MAJOR_COUNT);
+  const customMajorSelected = showCustomMajorInput || customMajors.length > 0;
   const customMajorDisabled = !customMajorSelected && selectedMajors.length >= MAX_MAJOR_COUNT;
   const canSubmit = form.title.trim().length > 0 && form.content.trim().length > 0;
 
   const patch = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
-
-  const onEnter =
-    (action: () => void) =>
-    (event: KeyboardEvent<HTMLInputElement>) => {
-      if (event.key !== "Enter") return;
-      event.preventDefault();
-      action();
-    };
 
   const changeCategory = (category: PostCategory) => {
     setForm((current) => {
@@ -214,60 +158,13 @@ export function PostForm({ mode, postId, initialPost }: Props) {
   };
 
   const toggleCustomMajorInput = () => {
-    if (form.customMajors.length > 0) {
+    if (customMajors.length > 0) {
       setShowCustomMajorInput(true);
       return;
     }
 
     if (customMajorDisabled) return;
     setShowCustomMajorInput((current) => !current);
-  };
-
-  const addTag = () => {
-    const nextTag = normalizeToken(form.tagInput);
-    if (!nextTag) return;
-
-    if (form.tags.length >= MAX_TAG_COUNT) {
-      showErrorToast("태그는 최대 8개까지 추가할 수 있습니다.");
-      return;
-    }
-
-    setForm((current) => ({
-      ...current,
-      tags: dedupeTokens([...current.tags, nextTag]).slice(0, MAX_TAG_COUNT),
-      tagInput: "",
-    }));
-  };
-
-  const removeTag = (tag: string) => {
-    setForm((current) => ({
-      ...current,
-      tags: current.tags.filter((item) => item !== tag),
-    }));
-  };
-
-  const addCustomMajor = () => {
-    const nextMajor = normalizeToken(form.customMajorInput).slice(0, CUSTOM_MAJOR_MAX_LENGTH);
-    if (!nextMajor) return;
-
-    if (selectedMajors.length >= MAX_MAJOR_COUNT) {
-      showErrorToast("직무/영역은 최대 3개까지 선택할 수 있습니다.");
-      return;
-    }
-
-    setForm((current) => ({
-      ...current,
-      customMajors: dedupeTokens([...current.customMajors, nextMajor]).slice(0, MAX_MAJOR_COUNT),
-      customMajorInput: "",
-    }));
-    setShowCustomMajorInput(true);
-  };
-
-  const removeCustomMajor = (major: string) => {
-    setForm((current) => ({
-      ...current,
-      customMajors: current.customMajors.filter((item) => item !== major),
-    }));
   };
 
   const submit = async () => {
@@ -325,7 +222,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
         title: form.title,
         content: form.content,
         category: form.category === "qna" ? "bug" : form.category,
-        tags: form.tags,
+        tags: fromCsv(form.tagsText),
         majors: selectedMajors,
         question: form.category === "qna" ? resolvedQuestionPayload : undefined,
         bug: form.category === "qna" ? resolvedBugPayload : form.category === "bug" ? activeBugPayload : undefined,
@@ -365,26 +262,20 @@ export function PostForm({ mode, postId, initialPost }: Props) {
               options={[
                 { value: "qna", label: CATEGORY_LABELS.qna },
                 { value: "bug", label: CATEGORY_LABELS.bug },
-                { value: "discussion", label: CATEGORY_LABELS.discussion },
                 { value: "talk", label: CATEGORY_LABELS.talk },
               ]}
             />
           </div>
 
           <div className="grid gap-4">
-            <Field label="태그" hint={TAG_HINT}>
-              <InputAction
-                id="post-tags"
-                content={TAG_PLACEHOLDER}
-                value={form.tagInput}
-                actionLabel="추가"
-                actionDisabled={!normalizeToken(form.tagInput) || form.tags.length >= MAX_TAG_COUNT}
-                onChange={(event) => patch("tagInput", event.target.value)}
-                onKeyDown={onEnter(addTag)}
-                onAction={addTag}
-              />
-              <TokenList values={form.tags} prefix="#" onRemove={removeTag} />
-            </Field>
+            <Input
+              id="post-tags"
+              label="태그"
+              content="nextjs, auth, cache"
+              hint="쉼표로 구분해 최대 8개까지 입력할 수 있습니다."
+              value={form.tagsText}
+              onChange={(event) => patch("tagsText", event.target.value)}
+            />
 
             <Field label="직무/영역">
               <MajorMultiSelect
@@ -414,18 +305,13 @@ export function PostForm({ mode, postId, initialPost }: Props) {
               />
               {customMajorSelected ? (
                 <div className="mt-3">
-                  <InputAction
+                  <Input
                     content={CUSTOM_MAJOR_PLACEHOLDER}
                     hint={CUSTOM_MAJOR_HINT}
-                    value={form.customMajorInput}
+                    value={form.customMajorsText}
                     maxLength={CUSTOM_MAJOR_MAX_LENGTH}
-                    actionLabel="추가"
-                    actionDisabled={!normalizeToken(form.customMajorInput) || selectedMajors.length >= MAX_MAJOR_COUNT}
-                    onChange={(event) => patch("customMajorInput", event.target.value)}
-                    onKeyDown={onEnter(addCustomMajor)}
-                    onAction={addCustomMajor}
+                    onChange={(event) => patch("customMajorsText", event.target.value)}
                   />
-                  <TokenList values={form.customMajors} onRemove={removeCustomMajor} />
                 </div>
               ) : null}
             </Field>
@@ -435,7 +321,10 @@ export function PostForm({ mode, postId, initialPost }: Props) {
 
       {form.category === "qna" ? (
         <section className="space-y-5 rounded-4xl border border-(--border) bg-(--surface) p-6 shadow-(--shadow) backdrop-blur-[18px]">
-          <Field label="해결 기록 정보" description="해결 기록은 항상 해결됨 상태로 저장됩니다.">
+          <Field
+            label="해결 기록 정보"
+            description="해결 기록은 항상 해결됨 상태로 저장됩니다."
+          >
             {null}
           </Field>
 
@@ -526,7 +415,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
             취소
           </Button>
           <Button type="button" variant="primary" onClick={submit} disabled={!canSubmit || submitting}>
-            {submitting ? "저장 중..." : mode === "create" ? "기록 게시" : "수정 저장"}
+            {submitting ? "저장 중.." : mode === "create" ? "기록 게시" : "수정 저장"}
           </Button>
         </div>
       </section>

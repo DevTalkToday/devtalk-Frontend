@@ -16,8 +16,7 @@ type NotificationKind =
   | "ADMIN_NOTICE"
   | "REPORT_SUBMITTED"
   | "REPORT_REVIEWED"
-  | "COMMENT_ACCEPTED"
-  | "FOLLOWING_POST";
+  | "COMMENT_ACCEPTED";
 type ConfigurableNotificationKind = Exclude<NotificationKind, "ADMIN_NOTICE">;
 
 type AuthUser = {
@@ -99,11 +98,6 @@ const notificationOptions: Array<{
     type: "REPORT_REVIEWED",
     label: "신고 처리 알림",
     description: "신고 처리 상태가 변경되었을 때 받습니다.",
-  },
-  {
-    type: "FOLLOWING_POST",
-    label: "팔로우 게시글 알림",
-    description: "팔로우한 사용자가 새 게시글을 등록했을 때 받습니다.",
   },
 ];
 

@@ -28,8 +28,7 @@ const formatDateTime = (value: string) =>
 const getHeadlineStatus = (post: PostDetail) => {
   if (post.category === "qna") return "해결됨";
   if (post.category === "bug") return post.bug ? BUG_STATUS_LABELS[post.bug.status] : "열림";
-  if (post.category === "discussion") return "모두 공개";
-  return "나만 보기";
+  return "기록 공유";
 };
 
 const getAcceptedCommentId = (post: PostDetail) => {
@@ -213,9 +212,7 @@ export default function PostDetailPage() {
                       ? "border-(--border) bg-(--accent-soft) text-(--accent)"
                       : post.category === "bug"
                         ? "border-(--bug-border) bg-(--bug-bg) text-(--bug-text)"
-                        : post.category === "discussion"
-                          ? "border-(--accent) bg-(--accent-soft) text-(--accent)"
-                          : "border-(--talk-border) bg-(--talk-bg) text-(--talk-text)",
+                        : "border-(--talk-border) bg-(--talk-bg) text-(--talk-text)",
                   ].join(" ")}
                 >
                   {CATEGORY_LABELS[post.category]}

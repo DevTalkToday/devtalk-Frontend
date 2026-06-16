@@ -25,10 +25,6 @@ const HOP_BY_HOP_HEADERS = new Set([
 const ABSOLUTE_URL_PATTERN = /^https?:\/\//i;
 const IDEMPOTENT_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RETRIABLE_UPSTREAM_STATUSES = new Set([404, 502, 503, 504]);
-const UPSTREAM_FETCH_TIMEOUT_MS = 8000;
-const LOCAL_BACKEND_PROXY_BASE_URL = "http://localhost:4000";
-const INTERNAL_BACKEND_PROXY_BASE_URL = "http://backend:4000";
-const PUBLIC_VM_PROXY_BASE_URL = "http://ssh.gsmsv.site:25124/api";
 
 const trimTrailingSlashes = (value: string) => value.replace(/\/+$/, "");
 
@@ -36,31 +32,17 @@ const isAbsoluteUrl = (value: string | undefined) => Boolean(value && ABSOLUTE_U
 
 const unique = <T,>(values: T[]) => Array.from(new Set(values));
 
-const isLocalHostname = (hostname: string) =>
-  hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
-
-const isVercelHostname = (hostname: string) => hostname.endsWith(".vercel.app");
-
-const getDefaultProxyCandidates = (request: NextRequest) => {
-  const hostname = request.nextUrl.hostname.toLowerCase();
-
-  if (isLocalHostname(hostname)) {
-    return [LOCAL_BACKEND_PROXY_BASE_URL];
-  }
-
-  if (isVercelHostname(hostname)) {
-    return [PUBLIC_VM_PROXY_BASE_URL];
-  }
-
-  return [INTERNAL_BACKEND_PROXY_BASE_URL, PUBLIC_VM_PROXY_BASE_URL];
-};
+const getDefaultProxyCandidates = () => [
+  "http://ssh.gsmsv.site:25124/api",
+  "https://devtalk.kr/api",
+];
 
 const resolveProxyBaseUrls = (request: NextRequest) => {
   const candidates = [
     process.env.API_PROXY_TARGET,
     process.env.NEXT_PUBLIC_API_URL,
     process.env.NEXT_PUBLIC_API_BASE_URL,
-    ...getDefaultProxyCandidates(request),
+    ...getDefaultProxyCandidates(),
   ]
     .map((value) => value?.trim() ?? "")
     .filter(isAbsoluteUrl)
@@ -124,14 +106,11 @@ const handle = async (request: NextRequest, context: RouteContext) => {
   const { path = [] } = await context.params;
   const headers = copyRequestHeaders(request);
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer();
-  const canRetryIdempotent = IDEMPOTENT_METHODS.has(request.method);
+  const canRetry = IDEMPOTENT_METHODS.has(request.method);
   let lastErrorResponse: NextResponse | null = null;
 
   for (const [index, proxyBaseUrl] of proxyBaseUrls.entries()) {
     const upstreamUrl = buildUpstreamUrl(proxyBaseUrl, path, request.nextUrl.search);
-    const hasNextCandidate = index < proxyBaseUrls.length - 1;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_FETCH_TIMEOUT_MS);
 
     try {
       const upstreamResponse = await fetch(upstreamUrl, {
@@ -139,7 +118,6 @@ const handle = async (request: NextRequest, context: RouteContext) => {
         headers,
         body,
         redirect: "manual",
-        signal: controller.signal,
       });
 
       const proxiedResponse = new NextResponse(upstreamResponse.body, {
@@ -148,53 +126,31 @@ const handle = async (request: NextRequest, context: RouteContext) => {
         headers: copyResponseHeaders(upstreamResponse),
       });
 
-      const canRetryOnNotFound = hasNextCandidate && upstreamResponse.status === 404;
-      const canRetryIdempotentError =
-        canRetryIdempotent &&
-        hasNextCandidate &&
-        RETRIABLE_UPSTREAM_STATUSES.has(upstreamResponse.status);
-
-      if (canRetryOnNotFound || canRetryIdempotentError) {
-        console.warn("[api-proxy] retrying upstream response", {
-          method: request.method,
-          requestPath: request.nextUrl.pathname,
-          search: request.nextUrl.search,
-          upstreamUrl,
-          status: upstreamResponse.status,
-        });
+      if (
+        canRetry &&
+        index < proxyBaseUrls.length - 1 &&
+        RETRIABLE_UPSTREAM_STATUSES.has(upstreamResponse.status)
+      ) {
         lastErrorResponse = proxiedResponse;
         continue;
       }
 
       return proxiedResponse;
-    } catch (error) {
-      console.error("[api-proxy] upstream request failed", {
-        method: request.method,
-        requestPath: request.nextUrl.pathname,
-        search: request.nextUrl.search,
-        upstreamUrl,
-        error,
-      });
-
-      if (hasNextCandidate) {
+    } catch {
+      if (canRetry && index < proxyBaseUrls.length - 1) {
         continue;
       }
 
       return NextResponse.json(
         {
-          message: "Upstream API timed out or could not be reached",
+          message: "Could not connect to upstream API",
         },
-        { status: 504 },
+        { status: 502 },
       );
-    } finally {
-      clearTimeout(timeoutId);
     }
   }
 
-  return (
-    lastErrorResponse ??
-    NextResponse.json({ message: "Upstream API timed out or could not be reached" }, { status: 504 })
-  );
+  return lastErrorResponse ?? NextResponse.json({ message: "Could not connect to upstream API" }, { status: 502 });
 };
 
 export const GET = handle;

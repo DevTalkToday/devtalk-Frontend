@@ -20,12 +20,12 @@ export const markdownComponents: Components = {
   hr: (props) => <hr className="my-6 border-0 border-t border-(--border)" {...props} />,
   blockquote: (props) => (
     <blockquote
-      className="my-3 whitespace-pre-wrap rounded-[20px] border border-(--border) bg-(--surface-soft) px-4 py-2 text-(--muted-strong) [&>p]:my-1 [&>p]:leading-7"
+      className="my-4 whitespace-pre-wrap rounded-[20px] border border-(--border) bg-(--surface-soft) px-4 py-3 text-(--muted-strong)"
       {...props}
     />
   ),
   a: (props) => <a className="text-(--accent) underline underline-offset-4" target="_blank" rel="noreferrer" {...props} />,
-  img: (props) => <img className="my-4 max-w-full border border-(--border)" alt={props.alt ?? ""} {...props} />,
+  img: (props) => <img className="my-4 max-w-full rounded-3xl border border-(--border)" alt={props.alt ?? ""} {...props} />,
   code: ({ inline, ...props }: MarkdownCodeProps) =>
     inline ? (
       <code className="rounded-lg bg-(--surface-soft) px-1.5 py-0.5 font-mono text-[0.92em]" {...props} />
