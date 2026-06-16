@@ -158,3 +158,12 @@ export function ChainLinkIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function QuoteIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M8.5 8.5h-2v3.5h3v3h-3.5a1 1 0 0 1-1-1v-3.5a2 2 0 0 1 2-2h1.5Z" />
+      <path d="M17.5 8.5h-2v3.5h3v3H15a1 1 0 0 1-1-1v-3.5a2 2 0 0 1 2-2h1.5Z" />
+    </svg>
+  );
+}

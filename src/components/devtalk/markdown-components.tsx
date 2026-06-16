@@ -20,7 +20,7 @@ export const markdownComponents: Components = {
   hr: (props) => <hr className="my-6 border-0 border-t border-(--border)" {...props} />,
   blockquote: (props) => (
     <blockquote
-      className="my-3 whitespace-pre-wrap rounded-[20px] border border-(--border) bg-(--surface-soft) px-4 py-2 text-(--muted-strong) [&>p]:my-1 [&>p]:leading-7"
+      className="my-3 whitespace-pre-wrap rounded-[20px] border border-(--border) bg-(--surface-soft) px-4 py-1.5 text-(--muted-strong) [&>p]:my-0.5 [&>p]:leading-6"
       {...props}
     />
   ),

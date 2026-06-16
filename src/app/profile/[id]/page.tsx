@@ -55,14 +55,6 @@ type CommentsResponse = {
   items: ProfileComment[];
 };
 
-type FriendSearchResult = {
-  user: {
-    id: number | string;
-  };
-  relationship: FriendRelationship;
-  friendshipId: number | null;
-};
-
 type ProfileTab = "posts" | "comments";
 
 type AuthUser = {
@@ -156,13 +148,6 @@ export default function PublicProfilePage() {
   const nickname = user?.nickname?.trim() || "사용자";
   const description = user?.description?.trim() || "아직 등록된 소개가 없습니다.";
   const majors = useMemo(() => user?.majors?.filter(Boolean) ?? [], [user?.majors]);
-  const relationshipLookupKeyword = useMemo(() => {
-    const candidates = [user?.email, user?.username, user?.nickname]
-      .map((value) => value?.trim() || "")
-      .filter((value) => value.length >= 2);
-
-    return candidates[0] ?? "";
-  }, [user?.email, user?.nickname, user?.username]);
   const profileIdentifier = user ? getProfileIdentifier(user) : "";
   const avatarInitial = nickname.slice(0, 1).toUpperCase() || "U";
   const posts = postsQuery.data?.items ?? [];
@@ -170,15 +155,19 @@ export default function PublicProfilePage() {
   const profilePending = !ready || profileQuery.isLoading;
   const profileMissing = ready && !profilePending && (profileQuery.isError || !user);
   const publicProfile = profilePending || profileMissing ? null : profile;
-  const relationshipQuery = useQuery({
-    queryKey: ["profile", id, "relationship", relationshipLookupKeyword],
-    enabled: Boolean(targetUserId) && loggedIn && !isOwnProfile && relationshipLookupKeyword.length >= 2,
-    queryFn: async () => {
-      const results = (await FetchGetAuth(`/friends/search?q=${encodeURIComponent(relationshipLookupKeyword)}`)) as FriendSearchResult[];
-      return results.find((entry) => String(entry.user.id) === String(targetUserId)) ?? null;
-    },
-  });
-  const friendshipStatus = relationshipQuery.data?.relationship ?? profile?.viewerFriendshipStatus ?? "NONE";
+  const resolvedTargetUserId = useMemo(() => {
+    const candidates = [publicProfile?.user.id, targetUserId];
+
+    for (const candidate of candidates) {
+      const parsed = Number(candidate);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+
+    return null;
+  }, [publicProfile?.user.id, targetUserId]);
+  const friendshipStatus = publicProfile?.viewerFriendshipStatus ?? "NONE";
   const following = publicProfile?.viewerFollowing ?? false;
   const followerCount = publicProfile?.followerCount ?? 0;
   const followingCount = publicProfile?.followingCount ?? 0;
@@ -191,30 +180,29 @@ export default function PublicProfilePage() {
   };
 
   const handleFriendAction = async () => {
-    if (!targetUserId || friendBusy) return;
+    if (!resolvedTargetUserId || friendBusy) return;
     if (friendshipStatus === "FRIEND" || friendshipStatus === "SENT") return;
     if (requireLoginForAction()) return;
 
     setFriendBusy(true);
     try {
-      await FetchPostAuth("/friends/requests", { userId: targetUserId });
+      await FetchPostAuth("/friends/requests", { userId: resolvedTargetUserId });
       await profileQuery.refetch();
-      await relationshipQuery.refetch();
     } finally {
       setFriendBusy(false);
     }
   };
 
   const handleFollowAction = async () => {
-    if (!targetUserId || followBusy) return;
+    if (!resolvedTargetUserId || followBusy) return;
     if (requireLoginForAction()) return;
 
     setFollowBusy(true);
     try {
       if (following) {
-        await FetchDeleteAuth(`/profile/${targetUserId}/follow`);
+        await FetchDeleteAuth(`/profile/${resolvedTargetUserId}/follow`);
       } else {
-        await FetchPostAuth(`/profile/${targetUserId}/follow`);
+        await FetchPostAuth(`/profile/${resolvedTargetUserId}/follow`);
       }
       await profileQuery.refetch();
     } finally {

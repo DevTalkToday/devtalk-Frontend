@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useDeferredValue, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ChainLinkIcon, CodeBracketsIcon, ListFormatIcon } from "@/components/devtalk/icons";
+import { ChainLinkIcon, CodeBracketsIcon, ListFormatIcon, QuoteIcon } from "@/components/devtalk/icons";
 import { markdownComponents } from "@/components/devtalk/markdown-components";
 import { normalizeRenderableMarkdown, safeUrlTransform } from "@/lib/posts/render-markdown";
 import { showErrorToast } from "@/lib/toast/events";
@@ -241,36 +241,39 @@ export default function MarkdownEditor({ value, onChange }: Props) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 rounded-[24px] border border-(--border) bg-(--surface-raised) p-1.5">
-          <ToolbarButton ariaLabel="제목 서식" title="제목 서식" onClick={() => prefixLines("## ", "제목")} disabled={!canEdit}>
+          <ToolbarButton ariaLabel="Heading" title="Heading" onClick={() => prefixLines("## ", "제목")} disabled={!canEdit}>
             <span className="text-[1.02rem] font-semibold">H</span>
           </ToolbarButton>
-          <ToolbarButton ariaLabel="굵게" title="굵게" onClick={() => wrapSelection("**", "**", "굵은 텍스트")} disabled={!canEdit}>
+          <ToolbarButton ariaLabel="Bold" title="Bold" onClick={() => wrapSelection("**", "**", "굵은 텍스트")} disabled={!canEdit}>
             <span className="text-[1.02rem] font-bold">B</span>
           </ToolbarButton>
-          <ToolbarButton ariaLabel="기울임" title="기울임" onClick={() => wrapSelection("*", "*", "기울임 텍스트")} disabled={!canEdit}>
+          <ToolbarButton ariaLabel="Italic" title="Italic" onClick={() => wrapSelection("*", "*", "기울임 텍스트")} disabled={!canEdit}>
             <span className="text-[1.02rem] italic">I</span>
           </ToolbarButton>
-          <ToolbarButton ariaLabel="목록" title="목록" onClick={() => prefixLines("- ", "목록 항목")} disabled={!canEdit}>
+          <ToolbarButton ariaLabel="List" title="List" onClick={() => prefixLines("- ", "목록 항목")} disabled={!canEdit}>
             <ListFormatIcon className="size-[18px]" />
           </ToolbarButton>
-          <ToolbarButton ariaLabel="코드" title="코드" onClick={insertCode} disabled={!canEdit}>
+          <ToolbarButton ariaLabel="Quote" title="Quote" onClick={() => prefixLines("> ", "인용문")} disabled={!canEdit}>
+            <QuoteIcon className="size-[18px]" />
+          </ToolbarButton>
+          <ToolbarButton ariaLabel="Code" title="Code" onClick={insertCode} disabled={!canEdit}>
             <CodeBracketsIcon className="size-[18px]" />
           </ToolbarButton>
-          <ToolbarButton ariaLabel="링크" title="링크" onClick={insertLink} disabled={!canEdit}>
+          <ToolbarButton ariaLabel="Link" title="Link" onClick={insertLink} disabled={!canEdit}>
             <ChainLinkIcon className="size-[18px]" />
           </ToolbarButton>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="sr-only"
-          onChange={async (event) => {
-            await insertImageFiles(Array.from(event.target.files ?? []));
-            event.target.value = "";
-          }}
-        />
-          <ToolbarButton ariaLabel="이미지 추가" title="이미지 추가" onClick={() => fileInputRef.current?.click()} disabled={!canEdit}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="sr-only"
+            onChange={async (event) => {
+              await insertImageFiles(Array.from(event.target.files ?? []));
+              event.target.value = "";
+            }}
+          />
+          <ToolbarButton ariaLabel="Insert image" title="Insert image" onClick={() => fileInputRef.current?.click()} disabled={!canEdit}>
             <span aria-hidden className="size-[18px] bg-current" style={clipMaskStyle} />
           </ToolbarButton>
         </div>
@@ -309,7 +312,7 @@ export default function MarkdownEditor({ value, onChange }: Props) {
             onPaste={onPaste}
             onDragOver={(event) => event.preventDefault()}
             onDrop={onDrop}
-            placeholder={`본문에 들어갈 내용을 작성해주세요`}
+            placeholder="본문에 들어갈 내용을 작성해주세요."
           />
         )}
 
