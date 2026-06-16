@@ -26,6 +26,9 @@ const ABSOLUTE_URL_PATTERN = /^https?:\/\//i;
 const IDEMPOTENT_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RETRIABLE_UPSTREAM_STATUSES = new Set([404, 502, 503, 504]);
 const UPSTREAM_FETCH_TIMEOUT_MS = 8000;
+const LOCAL_BACKEND_PROXY_BASE_URL = "http://localhost:4000";
+const INTERNAL_BACKEND_PROXY_BASE_URL = "http://backend:4000";
+const PUBLIC_VM_PROXY_BASE_URL = "http://ssh.gsmsv.site:25124/api";
 
 const trimTrailingSlashes = (value: string) => value.replace(/\/+$/, "");
 
@@ -33,23 +36,23 @@ const isAbsoluteUrl = (value: string | undefined) => Boolean(value && ABSOLUTE_U
 
 const unique = <T,>(values: T[]) => Array.from(new Set(values));
 
-const shouldUseInternalBackendProxy = (request: NextRequest) => {
-  const hostname = request.nextUrl.hostname.toLowerCase();
-  return hostname !== "localhost"
-    && hostname !== "127.0.0.1"
-    && hostname !== "[::1]"
-    && !hostname.endsWith(".vercel.app");
-};
+const isLocalHostname = (hostname: string) =>
+  hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+
+const isVercelHostname = (hostname: string) => hostname.endsWith(".vercel.app");
 
 const getDefaultProxyCandidates = (request: NextRequest) => {
-  const candidates: string[] = [];
+  const hostname = request.nextUrl.hostname.toLowerCase();
 
-  if (shouldUseInternalBackendProxy(request)) {
-    candidates.push("http://backend:4000");
+  if (isLocalHostname(hostname)) {
+    return [LOCAL_BACKEND_PROXY_BASE_URL];
   }
 
-  candidates.push("https://devtalk.kr/api", "http://ssh.gsmsv.site:25124/api");
-  return candidates;
+  if (isVercelHostname(hostname)) {
+    return [PUBLIC_VM_PROXY_BASE_URL];
+  }
+
+  return [INTERNAL_BACKEND_PROXY_BASE_URL, PUBLIC_VM_PROXY_BASE_URL];
 };
 
 const resolveProxyBaseUrls = (request: NextRequest) => {
@@ -152,12 +155,27 @@ const handle = async (request: NextRequest, context: RouteContext) => {
         RETRIABLE_UPSTREAM_STATUSES.has(upstreamResponse.status);
 
       if (canRetryOnNotFound || canRetryIdempotentError) {
+        console.warn("[api-proxy] retrying upstream response", {
+          method: request.method,
+          requestPath: request.nextUrl.pathname,
+          search: request.nextUrl.search,
+          upstreamUrl,
+          status: upstreamResponse.status,
+        });
         lastErrorResponse = proxiedResponse;
         continue;
       }
 
       return proxiedResponse;
-    } catch {
+    } catch (error) {
+      console.error("[api-proxy] upstream request failed", {
+        method: request.method,
+        requestPath: request.nextUrl.pathname,
+        search: request.nextUrl.search,
+        upstreamUrl,
+        error,
+      });
+
       if (hasNextCandidate) {
         continue;
       }
