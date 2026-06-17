@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const preferredRegion = "icn1";
+export const maxDuration = 15;
 
 type RouteContext = {
   params: Promise<{
