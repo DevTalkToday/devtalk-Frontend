@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { clearGithubSession, readGithubSession } from "@/lib/auth/github";
 import { FetchPost } from "@/lib/api/fetch";
 import { saveAuthSession } from "@/lib/auth/session";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 
 type Result =
   | { ok: true; code: string; redirectUri: string; codeVerifier: string | null }
@@ -62,6 +63,7 @@ function GithubCallbackContent() {
     const finishLogin = async () => {
       const result = validateCallback();
       if (!result.ok) {
+        startNavigationProgress();
         router.replace("/login");
         return;
       }
@@ -83,10 +85,12 @@ function GithubCallbackContent() {
 
         saveAuthSession(auth.accessToken, auth.user);
         clearGithubSession();
+        startNavigationProgress();
         router.replace(auth.user.profileCompleted ? "/" : "/auth/complete-profile");
       } catch {
         if (cancelled) return;
 
+        startNavigationProgress();
         router.replace("/login");
       }
     };

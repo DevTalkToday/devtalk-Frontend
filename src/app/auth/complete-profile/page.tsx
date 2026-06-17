@@ -8,6 +8,7 @@ import { Button, Input, Textarea } from "@/components/ui";
 import { FetchPostAuth } from "@/lib/api/fetch";
 import { saveAuthSession } from "@/lib/auth/session";
 import { isKnownMajorValue, normalizeMajorValues } from "@/lib/majors/normalize";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 
 type UserResponse = {
   id: number;
@@ -82,6 +83,7 @@ export default function CompleteProfilePage() {
 
       const accessToken = localStorage.getItem("accessToken");
       if (accessToken) saveAuthSession(accessToken, user);
+      startNavigationProgress();
       router.replace("/");
     } catch {
       // Request helper shows a toast with a safe message.

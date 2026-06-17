@@ -9,6 +9,7 @@ import { AppShell } from "@/components/devtalk/app-shell";
 import { PostCard } from "@/components/devtalk/post-card";
 import { Button, buttonClassName, chipButtonClassName } from "@/components/ui";
 import { FetchGet } from "@/lib/api/fetch";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 import {
   CATEGORY_LABELS,
   POST_CATEGORIES,
@@ -145,6 +146,7 @@ function PostsPageContent() {
     nextParams.set("match", nextMatch);
     nextParams.set("sort", nextSort);
     nextParams.set("page", String(nextPage));
+    startNavigationProgress();
     startTransition(() => router.push(`/posts?${nextParams.toString()}`));
   };
 

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { useAuthStatus } from "@/lib/auth/session";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 
 export function RequireLogin({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -25,7 +26,14 @@ export function RequireLogin({ children }: { children: React.ReactNode }) {
         <p className="text-sm leading-6 text-(--muted-strong)">
           이 기능은 로그인한 사용자만 사용할 수 있습니다. <br/>로그인 후 다시 시도해 주세요.
         </p>
-        <Button type="button" variant="primary" onClick={() => router.push("/login")}>
+        <Button
+          type="button"
+          variant="primary"
+          onClick={() => {
+            startNavigationProgress();
+            router.push("/login");
+          }}
+        >
           로그인
         </Button>
       </section>

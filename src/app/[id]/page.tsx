@@ -15,6 +15,7 @@ import { FetchDeleteAuth, FetchGet, FetchPostAuth } from "@/lib/api/fetch";
 import { BUG_STATUS_LABELS, CATEGORY_LABELS, type PostDetail } from "@/lib/posts/types";
 import { getProfileHref } from "@/lib/profile/links";
 import { useAuthStatus } from "@/lib/auth/session";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 
 const formatDateTime = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
@@ -88,6 +89,7 @@ export default function PostDetailPage() {
     try {
       await FetchDeleteAuth(`/posts/${id}`);
       void queryClient.invalidateQueries({ queryKey: ["posts"] });
+      startNavigationProgress();
       startTransition(() => router.push("/"));
     } finally {
       setDeleting(false);
@@ -97,6 +99,7 @@ export default function PostDetailPage() {
   const toggleBookmark = async () => {
     if (!post || bookmarking) return;
     if (ready && !loggedIn) {
+      startNavigationProgress();
       router.push("/login");
       return;
     }
@@ -119,6 +122,7 @@ export default function PostDetailPage() {
   const toggleLike = async () => {
     if (!post || liking) return;
     if (ready && !loggedIn) {
+      startNavigationProgress();
       router.push("/login");
       return;
     }

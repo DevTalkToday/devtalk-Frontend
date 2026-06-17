@@ -9,6 +9,7 @@ import { Button, Input } from "@/components/ui";
 import { textFieldClassName } from "@/components/ui/input";
 import { FetchPost } from "@/lib/api/fetch";
 import { saveAuthSession } from "@/lib/auth/session";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 import { showToast } from "@/lib/toast/events";
 
 type AuthResponse = {
@@ -219,6 +220,7 @@ export default function SignupPage() {
       })) as AuthResponse;
 
       saveAuthSession(auth.accessToken, auth.user);
+      startNavigationProgress();
       router.replace("/");
     } catch {
       // Request helper shows a toast with a safe message.

@@ -17,6 +17,7 @@ import {
   issueFreshGuestToken,
   useAuthStatus,
 } from "@/lib/auth/session";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 
 type AppShellProps = {
   title?: string;
@@ -323,11 +324,13 @@ export function AppShell({
     params.set("sort", "latest");
     params.set("page", "1");
 
+    startNavigationProgress();
     router.push(params.toString() ? `/?${params.toString()}` : "/");
   };
 
   const handleAuthButton = async () => {
     if (!loggedIn) {
+      startNavigationProgress();
       router.push("/login");
       return;
     }
@@ -341,6 +344,7 @@ export function AppShell({
     } finally {
       clearAuthSession();
       await issueFreshGuestToken().catch(() => undefined);
+      startNavigationProgress();
       router.replace("/");
     }
   };
@@ -373,6 +377,7 @@ export function AppShell({
                       <div key={item.href} ref={isMenuOpen ? openMenuRef : null} className="relative">
                         <Link
                           href={item.href}
+                          data-no-navigation-progress="true"
                           role="button"
                           title={item.label}
                           aria-label={item.label}

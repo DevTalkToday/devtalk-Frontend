@@ -10,6 +10,7 @@ import { ReportDialog, type ReportTarget } from "@/components/devtalk/report-dia
 import { Button, Field, Textarea } from "@/components/ui";
 import { FetchDeleteAuth, FetchPatchAuth, FetchPostAuth, FetchPutAuth } from "@/lib/api/fetch";
 import { isLoggedIn } from "@/lib/auth/session";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 import { type PostCategory, type PostComment, type PostDetail } from "@/lib/posts/types";
 import { getProfileHref } from "@/lib/profile/links";
 
@@ -128,6 +129,7 @@ export function PostComments({
     activeCommentAction?.type === "accept" && activeCommentAction.commentId === commentId;
   const requireLogin = () => {
     if (isLoggedIn()) return true;
+    startNavigationProgress();
     router.push("/login");
     return false;
   };

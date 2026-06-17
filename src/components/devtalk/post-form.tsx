@@ -8,6 +8,7 @@ import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import { Button, ChipGroup, Field, Input, InputAction, Textarea } from "@/components/ui";
 import { FetchPostAuth, FetchPutAuth } from "@/lib/api/fetch";
 import { isKnownMajorValue, normalizeMajorValues } from "@/lib/majors/normalize";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 import { BUG_STATUS_LABELS, CATEGORY_LABELS, type BugStatus, type PostCategory, type PostDetail } from "@/lib/posts/types";
 import { showErrorToast } from "@/lib/toast/events";
 
@@ -337,6 +338,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
           : await FetchPutAuth(`/posts/${postId}`, payload);
 
       const id = (response as PostDetail).id;
+      startNavigationProgress();
       startTransition(() => router.push(`/${id}`));
     } catch {
       // Request helper shows a toast with a safe message.
@@ -522,7 +524,13 @@ export function PostForm({ mode, postId, initialPost }: Props) {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" onClick={() => router.back()}>
+          <Button
+            type="button"
+            onClick={() => {
+              startNavigationProgress();
+              router.back();
+            }}
+          >
             취소
           </Button>
           <Button type="button" variant="primary" onClick={submit} disabled={!canSubmit || submitting}>

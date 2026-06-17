@@ -10,6 +10,7 @@ import { FetchPost } from "@/lib/api/fetch";
 import { saveAuthSession } from "@/lib/auth/session";
 import { startGithubLogin } from "@/lib/auth/github";
 import { canUseGoogleLogin, startGoogleLogin } from "@/lib/auth/google";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 import { showErrorToast } from "@/lib/toast/events";
 
 type AuthResponse = {
@@ -47,6 +48,7 @@ export default function LoginPage() {
       })) as AuthResponse;
 
       saveAuthSession(auth.accessToken, auth.user);
+      startNavigationProgress();
       router.replace("/");
     } catch {
       // Request helper shows a toast with a safe message.

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FetchPost } from "@/lib/api/fetch";
 import { clearGoogleSession, readGoogleSession } from "@/lib/auth/google";
 import { saveAuthSession } from "@/lib/auth/session";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 
 type Result =
   | { ok: true; code: string; redirectUri: string; codeVerifier: string }
@@ -57,6 +58,7 @@ function GoogleCallbackContent() {
     const finishLogin = async () => {
       const result = validateCallback();
       if (!result.ok) {
+        startNavigationProgress();
         router.replace("/login");
         return;
       }
@@ -78,10 +80,12 @@ function GoogleCallbackContent() {
 
         saveAuthSession(auth.accessToken, auth.user);
         clearGoogleSession();
+        startNavigationProgress();
         router.replace(auth.user.profileCompleted ? "/" : "/auth/complete-profile");
       } catch {
         if (cancelled) return;
 
+        startNavigationProgress();
         router.replace("/login");
       }
     };

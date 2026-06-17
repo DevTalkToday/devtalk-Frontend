@@ -10,6 +10,7 @@ import { PostCard } from "@/components/devtalk/post-card";
 import { ReportButton, ReportDialog } from "@/components/devtalk/report-dialog";
 import { FetchDeleteAuth, FetchGet, FetchGetAuth, FetchPostAuth } from "@/lib/api/fetch";
 import { getAuthUser, useAuthStatus } from "@/lib/auth/session";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 import { CATEGORY_LABELS, type PostCategory, type PostSummary } from "@/lib/posts/types";
 
 type PublicProfileUser = {
@@ -120,6 +121,7 @@ export default function PublicProfilePage() {
 
   useEffect(() => {
     if (isOwnProfile) {
+      startNavigationProgress();
       router.replace("/profile");
     }
   }, [isOwnProfile, router]);
@@ -175,6 +177,7 @@ export default function PublicProfilePage() {
   const requireLoginForAction = () => {
     if (!ready) return true;
     if (loggedIn) return false;
+    startNavigationProgress();
     router.push("/login");
     return true;
   };

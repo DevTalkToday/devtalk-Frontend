@@ -9,6 +9,7 @@ import { AppShell } from "@/components/devtalk/app-shell";
 import { PostCard } from "@/components/devtalk/post-card";
 import { Button, buttonClassName, chipButtonClassName } from "@/components/ui";
 import { FetchGet } from "@/lib/api/fetch";
+import { startNavigationProgress } from "@/lib/navigation/progress";
 import { type PostSummary } from "@/lib/posts/types";
 
 type PostsResponse = {
@@ -104,6 +105,7 @@ function HomePageContent() {
 
     params.set("sort", "latest");
     params.set("page", String(nextPage));
+    startNavigationProgress();
     startTransition(() => router.push(`/?${params.toString()}`));
   };
 
