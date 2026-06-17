@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const preferredRegion = "iad1";
-export const maxDuration = 15;
 
 type RouteContext = {
   params: Promise<{
@@ -27,7 +25,7 @@ const HOP_BY_HOP_HEADERS = new Set([
 const ABSOLUTE_URL_PATTERN = /^https?:\/\//i;
 const IDEMPOTENT_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RETRIABLE_UPSTREAM_STATUSES = new Set([404, 502, 503, 504]);
-const UPSTREAM_FETCH_TIMEOUT_MS = 6000;
+const UPSTREAM_FETCH_TIMEOUT_MS = 4000;
 
 const trimTrailingSlashes = (value: string) => value.replace(/\/+$/, "");
 
