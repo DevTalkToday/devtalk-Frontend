@@ -14,7 +14,6 @@ import {
   finishLogoutRedirect,
   getAccessToken,
   getAuthUser,
-  issueFreshGuestToken,
   useAuthStatus,
 } from "@/lib/auth/session";
 import { startNavigationProgress } from "@/lib/navigation/progress";
@@ -312,7 +311,6 @@ export function AppShell({
       // The local session should still be cleared even if the server token is already gone.
     } finally {
       clearAuthSession();
-      await issueFreshGuestToken().catch(() => undefined);
       startNavigationProgress();
       router.replace("/");
     }

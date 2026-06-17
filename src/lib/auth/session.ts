@@ -7,12 +7,6 @@ const AUTH_USER_KEY = "authUser";
 const LOGOUT_REDIRECT_KEY = "logoutRedirectingToHome";
 export const AUTH_CHANGED_EVENT = "devtalk-auth-changed";
 
-type GuestTokenResponse = {
-  accessToken: string;
-};
-
-let pendingGuestToken: Promise<string> | null = null;
-
 export const notifyAuthChanged = () => {
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 };
@@ -87,31 +81,6 @@ export const isLogoutRedirecting = () => {
   return sessionStorage.getItem(LOGOUT_REDIRECT_KEY) === "1";
 };
 
-export const ensureAccessToken = async () => {
-  const existing = getAccessToken();
-  if (existing) return existing;
-
-  if (isLoggedIn()) {
-    clearAuthSession();
-    throw new Error("Login session expired");
-  }
-
-  if (!pendingGuestToken) {
-    pendingGuestToken = fetchGuestToken().finally(() => {
-      pendingGuestToken = null;
-    });
-  }
-
-  return pendingGuestToken;
-};
-
-export const issueFreshGuestToken = async () => {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  const token = await ensureAccessToken();
-  notifyAuthChanged();
-  return token;
-};
-
 export const useAuthStatus = () => {
   const [state, setState] = useState({ ready: false, loggedIn: false, redirectingAfterLogout: false });
 
@@ -135,22 +104,3 @@ export const useAuthStatus = () => {
 
   return state;
 };
-
-async function fetchGuestToken() {
-  const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "");
-  const res = await fetch(`${apiUrl}/auth/token`, {
-    method: "POST",
-    headers: {
-      "ngrok-skip-browser-warning": "true",
-    },
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    throw new Error("게스트 토큰을 발급받지 못했습니다.");
-  }
-
-  const payload = (await res.json()) as GuestTokenResponse;
-  localStorage.setItem(ACCESS_TOKEN_KEY, payload.accessToken);
-  return payload.accessToken;
-}
