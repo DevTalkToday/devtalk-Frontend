@@ -105,8 +105,6 @@ const emptyNavIndicatorState: NavIndicatorState = {
   notifications: false,
 };
 
-const NAV_INDICATOR_POLL_INTERVAL_MS = 15_000;
-
 const isActivePath = (pathname: string, href: string) => {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -215,15 +213,11 @@ export function AppShell({
     };
 
     void syncProfile();
-    window.addEventListener("storage", syncProfile);
-    window.addEventListener("devtalk-auth-changed", syncProfile);
 
     return () => {
       alive = false;
-      window.removeEventListener("storage", syncProfile);
-      window.removeEventListener("devtalk-auth-changed", syncProfile);
     };
-  }, [authReady, loggedIn]);
+  }, [authReady, loggedIn, pathname]);
 
   useEffect(() => {
     setOpenMenuHref(null);
@@ -283,37 +277,12 @@ export function AppShell({
       });
     };
 
-    const handleFocus = () => {
-      void loadNavIndicators();
-    };
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden) void loadNavIndicators();
-    };
-
-    const handleAuthChange = () => {
-      void loadNavIndicators();
-    };
-
     void loadNavIndicators();
-    const intervalId = window.setInterval(() => {
-      if (!document.hidden) void loadNavIndicators();
-    }, NAV_INDICATOR_POLL_INTERVAL_MS);
-
-    window.addEventListener("focus", handleFocus);
-    window.addEventListener("storage", handleAuthChange);
-    window.addEventListener("devtalk-auth-changed", handleAuthChange);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       alive = false;
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", handleFocus);
-      window.removeEventListener("storage", handleAuthChange);
-      window.removeEventListener("devtalk-auth-changed", handleAuthChange);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [authReady, loggedIn]);
+  }, [authReady, loggedIn, pathname]);
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

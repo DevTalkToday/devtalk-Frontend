@@ -74,26 +74,16 @@ function HomePageContent() {
     ...(query ? { q: query } : {}),
   }).toString()}`;
 
-  const popularPath = `/posts?${new URLSearchParams({
-    sort: "popular",
-    page: "1",
-    limit: "5",
-    ...(query ? { q: query } : {}),
-  }).toString()}`;
-
   const latestQuery = useQuery({
     queryKey: ["posts", "home-latest", query, page],
     queryFn: () => fetchPosts(latestPath),
     placeholderData: keepPreviousData,
   });
 
-  const popularQuery = useQuery({
-    queryKey: ["posts", "home-popular", query],
-    queryFn: () => fetchPosts(popularPath),
-  });
-
   const latestItems = latestQuery.data?.items ?? [];
-  const popularItems = popularQuery.data?.items ?? [];
+  const popularItems = [...latestItems]
+    .sort((left, right) => right.likeCount - left.likeCount)
+    .slice(0, 5);
   const pageInfo = latestQuery.data?.pageInfo;
   const pages = pageInfo ? buildPages(pageInfo.page, pageInfo.totalPages) : [];
 
@@ -195,16 +185,16 @@ function HomePageContent() {
             </div>
 
             <div className="grid gap-3">
-              {popularQuery.isLoading ? (
+              {latestQuery.isLoading ? (
                 <p className="text-sm text-(--muted-strong)">인기 게시글을 불러오는 중입니다.</p>
               ) : null}
-              {popularQuery.isError ? (
+              {latestQuery.isError ? (
                 <p className="text-sm text-(--danger)">인기 게시글을 불러오지 못했습니다.</p>
               ) : null}
-              {!popularQuery.isLoading && !popularQuery.isError && popularItems.length === 0 ? (
+              {!latestQuery.isLoading && !latestQuery.isError && popularItems.length === 0 ? (
                 <p className="text-sm text-(--muted-strong)">표시할 인기 게시글이 없습니다.</p>
               ) : null}
-              {!popularQuery.isLoading && !popularQuery.isError
+              {!latestQuery.isLoading && !latestQuery.isError
                 ? popularItems.map((item, index) => <PopularPostItem key={item.id} post={item} index={index} />)
                 : null}
             </div>
