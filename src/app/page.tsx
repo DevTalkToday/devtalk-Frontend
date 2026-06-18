@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import { Suspense, startTransition } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -9,6 +9,7 @@ import { AppShell } from "@/components/devtalk/app-shell";
 import { PostCard } from "@/components/devtalk/post-card";
 import { Button, buttonClassName, chipButtonClassName } from "@/components/ui";
 import { FetchGet } from "@/lib/api/fetch";
+import { formatRelativePostDate } from "@/lib/date/relative";
 import { startNavigationProgress } from "@/lib/navigation/progress";
 import { type PostSummary } from "@/lib/posts/types";
 
@@ -23,6 +24,26 @@ type PostsResponse = {
     hasPreviousPage: boolean;
   };
 };
+
+const LATEST_POSTS_HEADING = "\uCD5C\uC2E0 \uAC8C\uC2DC\uAE00";
+const WRITE_LABEL = "\uAE00 \uC791\uC131";
+const POSTS_LOADING = "\uAC8C\uC2DC\uAE00\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4.";
+const POSTS_ERROR = "\uAC8C\uC2DC\uAE00 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.";
+const EMPTY_POSTS_TITLE = "\uAC8C\uC2DC\uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4";
+const EMPTY_POSTS_DESCRIPTION =
+  "\uAC80\uC0C9\uC5B4\uB97C \uBC14\uAFB8\uAC70\uB098 \uC0C8 \uAC8C\uC2DC\uAE00\uC744 \uC791\uC131\uD574 \uC8FC\uC138\uC694.";
+const PAGE_INFO_LABEL = (totalCount: number, page: number, totalPages: number) =>
+  `\uCD1D ${totalCount}\uAC1C \uC911 ${page} / ${totalPages} \uD398\uC774\uC9C0`;
+const PREVIOUS_LABEL = "\uC774\uC804";
+const NEXT_LABEL = "\uB2E4\uC74C";
+const HELP_WANTED_BADGE = "\uB3C4\uC6C0 \uD544\uC694";
+const HELP_WANTED_PANEL_TITLE = "\uB3C4\uC640\uC8FC\uC138\uC694!";
+const HELP_WANTED_PANEL_META = "\uCD5C\uC2E0 5\uAC1C";
+const HELP_WANTED_LOADING = "\uB3C4\uC6C0 \uD544\uC694 \uAC8C\uC2DC\uAE00\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4.";
+const HELP_WANTED_ERROR = "\uB3C4\uC6C0 \uD544\uC694 \uAC8C\uC2DC\uAE00\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.";
+const HELP_WANTED_EMPTY = "\uD45C\uC2DC\uD560 \uB3C4\uC6C0 \uD544\uC694 \uAC8C\uC2DC\uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.";
+const COMMENTS_LABEL = (count: number) => `\uB313\uAE00 ${count}`;
+const SUSPENSE_FALLBACK = "\uAC8C\uC2DC\uAE00\uC744 \uC900\uBE44\uD558\uB294 \uC911\uC785\uB2C8\uB2E4.";
 
 const buildPages = (current: number, total: number) => {
   const pages: Array<number | "ellipsis"> = [];
@@ -45,18 +66,24 @@ const buildPages = (current: number, total: number) => {
 
 const fetchPosts = (path: string) => FetchGet(path) as Promise<PostsResponse>;
 
-function PopularPostItem({ post, index }: { post: PostSummary; index: number }) {
+function HelpWantedPostItem({ post }: { post: PostSummary }) {
   return (
     <Link
       href={`/${post.id}`}
       className="grid gap-2 rounded-2xl border border-(--border) bg-(--surface-raised) p-4 transition duration-150 hover:-translate-y-px hover:border-(--accent) hover:bg-(--surface-soft)"
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-bold text-(--accent)">#{index + 1}</span>
-        <span className="text-xs text-(--muted-strong)">좋아요 {post.likeCount}</span>
+        <span className="inline-flex w-fit items-center rounded-full border border-(--bug-border) bg-(--bug-bg) px-2.5 py-1 text-[11px] font-semibold text-(--bug-text)">
+          {HELP_WANTED_BADGE}
+        </span>
+        <span className="text-xs text-(--muted-strong)">{formatRelativePostDate(post.createdAt)}</span>
       </div>
       <h3 className="line-clamp-2 text-sm font-semibold leading-6">{post.title}</h3>
       <p className="line-clamp-2 text-xs leading-5 text-(--muted-strong)">{post.excerpt}</p>
+      <div className="flex items-center justify-between gap-3 text-xs text-(--muted-strong)">
+        <span>{post.author.nickname}</span>
+        <span>{COMMENTS_LABEL(post.commentCount)}</span>
+      </div>
     </Link>
   );
 }
@@ -74,16 +101,27 @@ function HomePageContent() {
     ...(query ? { q: query } : {}),
   }).toString()}`;
 
+  const helpWantedPath = `/posts?${new URLSearchParams({
+    category: "bug",
+    resolution: "unresolved",
+    sort: "latest",
+    page: "1",
+    limit: "5",
+  }).toString()}`;
+
   const latestQuery = useQuery({
     queryKey: ["posts", "home-latest", query, page],
     queryFn: () => fetchPosts(latestPath),
     placeholderData: keepPreviousData,
   });
 
+  const helpWantedQuery = useQuery({
+    queryKey: ["posts", "home-help-wanted"],
+    queryFn: () => fetchPosts(helpWantedPath),
+  });
+
   const latestItems = latestQuery.data?.items ?? [];
-  const popularItems = [...latestItems]
-    .sort((left, right) => right.likeCount - left.likeCount)
-    .slice(0, 5);
+  const helpWantedItems = helpWantedQuery.data?.items ?? [];
   const pageInfo = latestQuery.data?.pageInfo;
   const pages = pageInfo ? buildPages(pageInfo.page, pageInfo.totalPages) : [];
 
@@ -105,30 +143,30 @@ function HomePageContent() {
         <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-semibold md:text-3xl">최신 게시글</h1>
+              <h1 className="text-2xl font-semibold md:text-3xl">{LATEST_POSTS_HEADING}</h1>
             </div>
             <Link href="/write" className={buttonClassName({ variant: "primary", className: "write-action-button" })}>
               <Image src="/pencil.svg" alt="" width={16} height={16} className="write-action-icon size-4" />
-              글 작성
+              {WRITE_LABEL}
             </Link>
           </div>
 
           {latestQuery.isLoading ? (
             <div className="rounded-[28px] border border-(--border) bg-(--surface) p-6 text-sm text-(--muted-strong) shadow-(--shadow)">
-              게시글을 불러오는 중입니다.
+              {POSTS_LOADING}
             </div>
           ) : null}
 
           {latestQuery.isError ? (
             <div className="rounded-[28px] border border-(--border) bg-(--surface) p-6 text-sm text-(--danger) shadow-(--shadow)">
-              게시글 목록을 불러오지 못했습니다.
+              {POSTS_ERROR}
             </div>
           ) : null}
 
           {!latestQuery.isLoading && !latestQuery.isError && latestItems.length === 0 ? (
             <div className="rounded-[28px] border border-(--border) bg-(--surface) p-6 shadow-(--shadow)">
-              <h2 className="text-lg font-semibold">게시글이 없습니다</h2>
-              <p className="mt-2 text-sm leading-6 text-(--muted-strong)">검색어를 바꾸거나 새 게시글을 작성해 주세요.</p>
+              <h2 className="text-lg font-semibold">{EMPTY_POSTS_TITLE}</h2>
+              <p className="mt-2 text-sm leading-6 text-(--muted-strong)">{EMPTY_POSTS_DESCRIPTION}</p>
             </div>
           ) : null}
 
@@ -139,7 +177,7 @@ function HomePageContent() {
           {pageInfo ? (
             <div className="flex flex-col gap-4 rounded-[28px] border border-(--border) bg-(--surface) p-5 shadow-(--shadow) md:flex-row md:items-center md:justify-between">
               <p className="text-sm text-(--muted-strong)">
-                총 {pageInfo.totalCount}개 중 {pageInfo.page} / {pageInfo.totalPages} 페이지
+                {PAGE_INFO_LABEL(pageInfo.totalCount, pageInfo.page, pageInfo.totalPages)}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <Button
@@ -147,7 +185,7 @@ function HomePageContent() {
                   disabled={!pageInfo.hasPreviousPage}
                   onClick={() => applyPage(pageInfo.page - 1)}
                 >
-                  이전
+                  {PREVIOUS_LABEL}
                 </Button>
                 {pages.map((item, index) =>
                   item === "ellipsis" ? (
@@ -170,7 +208,7 @@ function HomePageContent() {
                   disabled={!pageInfo.hasNextPage}
                   onClick={() => applyPage(pageInfo.page + 1)}
                 >
-                  다음
+                  {NEXT_LABEL}
                 </Button>
               </div>
             </div>
@@ -180,22 +218,22 @@ function HomePageContent() {
         <aside className="space-y-4">
           <div className="rounded-[28px] border border-(--border) bg-(--surface) p-5 shadow-(--shadow) backdrop-blur-[18px]">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">인기 게시글</h2>
-              <span className="text-xs font-semibold text-(--muted-strong)">TOP 5</span>
+              <h2 className="text-lg font-semibold">{HELP_WANTED_PANEL_TITLE}</h2>
+              <span className="text-xs font-semibold text-(--muted-strong)">{HELP_WANTED_PANEL_META}</span>
             </div>
 
             <div className="grid gap-3">
-              {latestQuery.isLoading ? (
-                <p className="text-sm text-(--muted-strong)">인기 게시글을 불러오는 중입니다.</p>
+              {helpWantedQuery.isLoading ? (
+                <p className="text-sm text-(--muted-strong)">{HELP_WANTED_LOADING}</p>
               ) : null}
-              {latestQuery.isError ? (
-                <p className="text-sm text-(--danger)">인기 게시글을 불러오지 못했습니다.</p>
+              {helpWantedQuery.isError ? (
+                <p className="text-sm text-(--danger)">{HELP_WANTED_ERROR}</p>
               ) : null}
-              {!latestQuery.isLoading && !latestQuery.isError && popularItems.length === 0 ? (
-                <p className="text-sm text-(--muted-strong)">표시할 인기 게시글이 없습니다.</p>
+              {!helpWantedQuery.isLoading && !helpWantedQuery.isError && helpWantedItems.length === 0 ? (
+                <p className="text-sm text-(--muted-strong)">{HELP_WANTED_EMPTY}</p>
               ) : null}
-              {!latestQuery.isLoading && !latestQuery.isError
-                ? popularItems.map((item, index) => <PopularPostItem key={item.id} post={item} index={index} />)
+              {!helpWantedQuery.isLoading && !helpWantedQuery.isError
+                ? helpWantedItems.map((item) => <HelpWantedPostItem key={item.id} post={item} />)
                 : null}
             </div>
           </div>
@@ -207,7 +245,7 @@ function HomePageContent() {
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-(--muted-strong)">게시글을 준비하는 중입니다.</div>}>
+    <Suspense fallback={<div className="p-6 text-sm text-(--muted-strong)">{SUSPENSE_FALLBACK}</div>}>
       <HomePageContent />
     </Suspense>
   );
