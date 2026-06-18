@@ -76,7 +76,7 @@ function getMajor(user: FriendUser) {
 }
 
 function getDescription(user: FriendUser) {
-  return user.description?.trim() || `@${user.username}`;
+  return user.description?.trim() || null;
 }
 
 function ProfileAvatar({ user, size }: { user: FriendUser; size: "md" | "sm" }) {
@@ -119,6 +119,7 @@ function ProfileCard({
 }) {
   const person = friendship.user;
   const profileHref = getProfileHref(person);
+  const description = getDescription(person);
 
   return (
     <article className="grid gap-4 rounded-[24px] border border-(--border) bg-(--surface-raised) p-5 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
@@ -135,7 +136,7 @@ function ProfileCard({
             {getMajor(person)}
           </span>
         </div>
-        <p className="mt-1 text-sm leading-6 text-(--muted-strong)">{getDescription(person)}</p>
+        {description ? <p className="mt-1 text-sm leading-6 text-(--muted-strong)">{description}</p> : null}
       </div>
 
       {tab === "friends" ? (
@@ -187,6 +188,7 @@ function SearchCard({
 }) {
   const disabled = busy || result.relationship !== "NONE";
   const profileHref = getProfileHref(result.user);
+  const description = getDescription(result.user);
   const labelByRelationship: Record<Relationship, string> = {
     NONE: "친구 요청",
     FRIEND: "이미 친구",
@@ -203,7 +205,7 @@ function SearchCard({
         <Link href={profileHref} className="font-semibold transition hover:text-(--accent)">
           {result.user.nickname}
         </Link>
-        <p className="mt-1 text-sm text-(--muted-strong)">{getDescription(result.user)}</p>
+        {description ? <p className="mt-1 text-sm text-(--muted-strong)">{description}</p> : null}
       </div>
       <Button type="button" size="sm" disabled={disabled} onClick={() => onRequest(result.user.id)}>
         {labelByRelationship[result.relationship]}

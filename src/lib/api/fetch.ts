@@ -149,6 +149,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   ADMIN_REQUIRED: "관리자 권한이 필요합니다.",
   ADMIN_USER_DELETE_FORBIDDEN: "관리자 계정은 삭제할 수 없습니다.",
   GUEST_USER_DELETE_FORBIDDEN: "게스트 계정은 삭제할 수 없습니다.",
+  MAJOR_REQUIRED: "삭제할 전공/관심 분야를 확인해주세요.",
   REPORT_TARGET_REQUIRED: "신고 대상을 확인해주세요.",
   REPORT_CONTENT_REQUIRED: "신고 제목과 내용을 입력해주세요.",
   USER_NOT_FOUND: "유저를 찾을 수 없습니다.",

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RequireLogin } from "@/components/auth/require-login";
 import { AppShell } from "@/components/devtalk/app-shell";
 import { ConstructionState } from "@/components/devtalk/construction-state";
+import { TrashIcon } from "@/components/devtalk/icons";
 import { Button, Input } from "@/components/ui";
 import { FetchDeleteAuth, FetchGetAuth, FetchPatchAuth } from "@/lib/api/fetch";
 import { getAuthUser } from "@/lib/auth/session";
@@ -460,10 +461,25 @@ function UserManagement() {
     },
   });
 
+  const deleteMajorMutation = useMutation({
+    mutationFn: ({ userId, major }: { userId: number; major: string }) =>
+      FetchDeleteAuth(`/admin/users/${userId}/majors?major=${encodeURIComponent(major)}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      showToast({ title: "삭제 완료", message: "전공/관심 분야가 삭제되었습니다.", tone: "success" });
+    },
+  });
+
   const removeUser = (user: AdminUser) => {
-    if (user.admin || deleteMutation.isPending) return;
+    if (user.admin || deleteMutation.isPending || deleteMajorMutation.isPending) return;
     if (!window.confirm(`${user.nickname || user.username} 유저를 삭제할까요? 작성한 게시글, 댓글, 메시지가 함께 정리됩니다.`)) return;
     deleteMutation.mutate(user.id);
+  };
+
+  const removeMajor = (user: AdminUser, major: string) => {
+    if (deleteMajorMutation.isPending) return;
+    if (!window.confirm(`${user.nickname || user.username} 유저의 "${major}" 전공/관심 분야를 삭제할까요?`)) return;
+    deleteMajorMutation.mutate({ userId: user.id, major });
   };
 
   const users = usersQuery.data ?? [];
@@ -504,14 +520,40 @@ function UserManagement() {
                 {user.email || user.username} · 게시글 {user.postCount}개 · 댓글 {user.commentCount}개 · 가입 {formatDateTime(user.createdAt)}
               </p>
               {user.majors.length ? (
-                <p className="mt-1 break-words text-xs text-(--muted-strong)">전공/관심: {user.majors.join(", ")}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {user.majors.map((major) => {
+                    const deletingMajor =
+                      deleteMajorMutation.isPending &&
+                      deleteMajorMutation.variables?.userId === user.id &&
+                      deleteMajorMutation.variables?.major === major;
+
+                    return (
+                      <span
+                        key={major}
+                        className="inline-flex max-w-full items-center gap-2 rounded-full border border-(--border) bg-(--surface-soft) px-3 py-1 text-xs font-semibold text-(--muted-strong)"
+                      >
+                        <span className="min-w-0 truncate">{major}</span>
+                        <button
+                          type="button"
+                          aria-label={`${major} 전공/관심 삭제`}
+                          title={`${major} 전공/관심 삭제`}
+                          disabled={deletingMajor || deleteMajorMutation.isPending}
+                          onClick={() => removeMajor(user, major)}
+                          className="grid size-5 shrink-0 place-items-center rounded-full text-(--danger) transition hover:bg-(--surface) disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <TrashIcon className="size-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
               ) : null}
             </div>
             <Button
               type="button"
               variant="danger"
               size="sm"
-              disabled={user.admin || deleting || deleteMutation.isPending}
+              disabled={user.admin || deleting || deleteMutation.isPending || deleteMajorMutation.isPending}
               onClick={() => removeUser(user)}
             >
               {deleting ? "삭제 중" : "유저 삭제"}
