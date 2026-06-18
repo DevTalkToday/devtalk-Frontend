@@ -15,7 +15,7 @@ const getPlainTextChild = (children: ReactNode): string | null => {
     const text = children.map((child) => getPlainTextChild(child)).join("");
     return text || null;
   }
-  if (isValidElement(children)) {
+  if (isValidElement<{ children?: ReactNode }>(children)) {
     return getPlainTextChild(children.props.children);
   }
 
