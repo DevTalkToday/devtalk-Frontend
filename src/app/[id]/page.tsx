@@ -26,6 +26,8 @@ const formatDateTime = (value: string) =>
     minute: "2-digit",
   }).format(new Date(value));
 
+const isEditedPost = (post: PostDetail) => Boolean(post.updatedAt && post.updatedAt !== post.createdAt);
+
 const getHeadlineStatus = (post: PostDetail) => {
   if (post.category === "qna") return "해결됨";
   if (post.category === "bug") return post.bug ? BUG_STATUS_LABELS[post.bug.status] : "열림";
@@ -268,7 +270,10 @@ export default function PostDetailPage() {
                 </div>
               ) : null}
 
-              <MarkdownBody value={post.content} />
+              <div className="space-y-3">
+                <MarkdownBody value={post.content} />
+                {isEditedPost(post) ? <p className="text-sm font-medium text-(--muted-strong)">(편집됨)</p> : null}
+              </div>
 
               <div className="flex justify-end pt-2">
                 <button

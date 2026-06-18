@@ -36,9 +36,11 @@ type FormState = {
   bugSteps: string;
 };
 
-const BUG_STATUS_FORM_OPTIONS: BugStatus[] = ["open", "fixed", "closed"];
+const BUG_STATUS_FORM_OPTIONS: BugStatus[] = ["open", "investigating", "closed"];
 const MAX_MAJOR_COUNT = 3;
 const MAX_TAG_COUNT = 8;
+const MAX_POST_TITLE_LENGTH = 100;
+const MAX_POST_CONTENT_LENGTH = 2000;
 const CUSTOM_MAJOR_BUTTON_LABEL = "기타 입력";
 const CUSTOM_MAJOR_PLACEHOLDER = "직접 입력";
 const CUSTOM_MAJOR_HINT = "기타 직무/영역은 하나씩 추가되며, 선택 항목을 포함해 최대 3개까지 저장됩니다.";
@@ -186,7 +188,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
         return {
           ...copyQuestionFieldsToBug(current),
           category,
-          bugStatus: current.bugStatus === "closed" ? "fixed" : current.bugStatus,
+          bugStatus: current.bugStatus === "closed" || current.bugStatus === "fixed" ? "open" : current.bugStatus,
         };
       }
 
@@ -323,8 +325,8 @@ export function PostForm({ mode, postId, initialPost }: Props) {
       };
 
       const payload = {
-        title: form.title,
-        content: form.content,
+        title: form.title.trim().slice(0, MAX_POST_TITLE_LENGTH),
+        content: form.content.trim().slice(0, MAX_POST_CONTENT_LENGTH),
         category: form.category === "qna" ? "bug" : form.category,
         tags: form.tags,
         majors: selectedMajors,
@@ -357,7 +359,9 @@ export function PostForm({ mode, postId, initialPost }: Props) {
               label="제목*"
               content="제목에 핵심 내용을 담아 작성해 주세요"
               value={form.title}
+              maxLength={MAX_POST_TITLE_LENGTH}
               onChange={(event) => patch("title", event.target.value)}
+              hint={`${form.title.length}/${MAX_POST_TITLE_LENGTH}`}
             />
 
             <ChipGroup
@@ -515,7 +519,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
 
       <section className="space-y-4 rounded-4xl border border-(--border) bg-(--surface) p-6 shadow-(--shadow) backdrop-blur-[18px]">
         <Field label="본문*">{null}</Field>
-        <MarkdownEditor value={form.content} onChange={(next) => patch("content", next)} />
+        <MarkdownEditor value={form.content} onChange={(next) => patch("content", next)} maxLength={MAX_POST_CONTENT_LENGTH} />
       </section>
 
       <section className="flex flex-col gap-4 rounded-4xl border border-(--border) bg-(--surface) p-6 shadow-(--shadow) backdrop-blur-[18px] md:flex-row md:items-center md:justify-between">

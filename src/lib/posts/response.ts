@@ -157,7 +157,7 @@ export const normalizePostDetailResponse = (value: unknown): PostDetail => {
   const post = asRecord(value);
   const rawCategory = trimText(post.category).toLowerCase();
   const bug = normalizeBug(post.bug);
-  const legacyResolvedBug = rawCategory === "bug" && bug?.status === "closed";
+  const legacyResolvedBug = rawCategory === "bug" && (bug?.status === "closed" || bug?.status === "fixed");
   const category = legacyResolvedBug ? "qna" : (isCategory(rawCategory) ? rawCategory : "talk");
   const question = legacyResolvedBug ? normalizeResolvedQuestionFromBug(bug) : normalizeQuestion(post.question);
   const comments = Array.isArray(post.comments) ? post.comments.map(normalizeComment) : [];

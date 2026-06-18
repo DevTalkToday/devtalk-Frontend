@@ -85,8 +85,8 @@ export const createExcerpt = (content: string) =>
 
 export const normalizePostPayload = (body: unknown, existing?: PostDetail): PostPayload => {
   const record = asRecord(body);
-  const title = trimText(record.title).slice(0, 120);
-  const content = String(record.content ?? "").trim();
+  const title = trimText(record.title).slice(0, 100);
+  const content = String(record.content ?? "").trim().slice(0, 2000);
   const rawCategory = trimText(record.category).toLowerCase();
   const category = isCategory(rawCategory) ? rawCategory : existing?.category ?? "talk";
 

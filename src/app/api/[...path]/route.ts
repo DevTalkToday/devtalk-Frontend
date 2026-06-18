@@ -34,6 +34,8 @@ const isAbsoluteUrl = (value: string | undefined) => Boolean(value && ABSOLUTE_U
 const unique = <T,>(values: T[]) => Array.from(new Set(values));
 
 const isVercelRuntime = () => process.env.VERCEL === "1";
+const LOCAL_API_HOSTNAMES = ["localhost", "127.0.0.1"];
+const LOCAL_API_PORT = 4000;
 const VM_API_HOSTNAME = "ssh.gsmsv.site";
 const VM_API_ADDRESS = "158.247.251.109";
 const BLOCKED_PROXY_HOSTNAMES = new Set(["backend", "devtalk.kr", "www.devtalk.kr"]);
@@ -57,14 +59,17 @@ const isAllowedProxyCandidate = (candidate: string, request: NextRequest) => {
   }
 };
 
-const getDefaultProxyCandidates = () => {
+const getLocalProxyCandidates = () =>
+  LOCAL_API_HOSTNAMES.map((hostname) => `http://${hostname}:${LOCAL_API_PORT}`);
+
+const getVercelProxyCandidates = () => {
   const hostnameTarget = `http://${VM_API_HOSTNAME}:25124/api`;
   const addressTarget = `http://${VM_API_ADDRESS}:25124/api`;
   return [hostnameTarget, addressTarget];
 };
 
 const resolveProxyBaseUrls = (request: NextRequest) => {
-  const defaultCandidates = getDefaultProxyCandidates();
+  const defaultCandidates = isVercelRequest(request) ? getVercelProxyCandidates() : getLocalProxyCandidates();
   const rawCandidates = [process.env.API_PROXY_TARGET, ...defaultCandidates];
 
   const candidates = rawCandidates
@@ -122,7 +127,9 @@ const handle = async (request: NextRequest, context: RouteContext) => {
 
   const { path = [] } = await context.params;
   const headers = copyRequestHeaders(request);
-  const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer();
+  const body = request.method === "GET" || request.method === "HEAD"
+    ? undefined
+    : Buffer.from(await request.arrayBuffer());
   const canRetryIdempotent = IDEMPOTENT_METHODS.has(request.method);
   let lastErrorResponse: NextResponse | null = null;
 

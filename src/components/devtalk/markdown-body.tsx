@@ -7,7 +7,7 @@ import { normalizeRenderableMarkdown, safeUrlTransform } from "@/lib/posts/rende
 
 export function MarkdownBody({ value }: { value: string }) {
   return (
-    <div className="text-(--foreground)">
+    <div className="markdown-rich text-(--foreground)">
       <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={safeUrlTransform} components={markdownComponents}>
         {normalizeRenderableMarkdown(value)}
       </ReactMarkdown>

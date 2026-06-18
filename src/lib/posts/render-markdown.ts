@@ -3,6 +3,9 @@ const PARAGRAPH_TAG_PATTERN = /^<(p|div)(?:\s[^>]*)?>([\s\S]*?)<\/\1\s*>/i;
 const LINE_BREAK_TAG_PATTERN = /^<br(?:\s[^>]*)?\s*\/?>/i;
 const HORIZONTAL_RULE_TAG_PATTERN = /^<hr(?:\s[^>]*)?\s*\/?>/i;
 const FENCE_TAG_PATTERN = /^([`~]{3,})/;
+const LIST_ITEM_PATTERN = /^ {0,3}(?:[-+*]|\d+[.)])(?:\s+|\t+)/;
+export const BLANK_LINE_TOKEN_PREFIX = "@@DEVTALK_BLANK_LINES_";
+export const BLANK_LINE_TOKEN_SUFFIX = "@@";
 
 const normalizeInlineHtml = (value: string) =>
   value
@@ -14,6 +17,77 @@ const normalizeInlineHtml = (value: string) =>
     .replace(/\n[ \t]+/g, "\n");
 
 const collapseWhitespace = (value: string) => value.replace(/\s+/g, " ").trim();
+
+const createBlankLineToken = (count: number) => `${BLANK_LINE_TOKEN_PREFIX}${count}${BLANK_LINE_TOKEN_SUFFIX}`;
+
+const getListContinuationIndent = (line: string) => {
+  const match = line.match(LIST_ITEM_PATTERN);
+  return match ? " ".repeat(match[0].length) : "";
+};
+
+const preserveBlankLineRuns = (value: string) => {
+  const lines = value.split("\n");
+  const normalized: string[] = [];
+  let fenceMarker: "`" | "~" | null = null;
+  let fenceLength = 0;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const trimmedStart = line.trimStart();
+    const fenceMatch = trimmedStart.match(FENCE_TAG_PATTERN);
+
+    if (fenceMatch) {
+      const marker = fenceMatch[1][0] as "`" | "~";
+      const length = fenceMatch[1].length;
+
+      if (!fenceMarker) {
+        fenceMarker = marker;
+        fenceLength = length;
+      } else if (fenceMarker === marker && length >= fenceLength) {
+        fenceMarker = null;
+        fenceLength = 0;
+      }
+
+      normalized.push(line);
+      continue;
+    }
+
+    if (!fenceMarker && line.trim().length === 0) {
+      let blankCount = 1;
+      while (index + blankCount < lines.length && lines[index + blankCount].trim().length === 0) {
+        blankCount += 1;
+      }
+
+      const previousLine = lines[index - 1] ?? "";
+      const nextLine = lines[index + blankCount] ?? "";
+      const betweenListItems =
+        LIST_ITEM_PATTERN.test(previousLine.trimStart()) && LIST_ITEM_PATTERN.test(nextLine.trimStart());
+
+      if (betweenListItems) {
+        const continuationIndent = getListContinuationIndent(previousLine);
+        for (let blankIndex = 0; blankIndex < blankCount; blankIndex += 1) {
+          normalized.push(`${continuationIndent}<br />`);
+        }
+      } else {
+        normalized.push("");
+
+        if (blankCount > 1) {
+          const extraBlankCount = blankCount - 1;
+          const token = createBlankLineToken(extraBlankCount);
+          normalized.push(token);
+          normalized.push("");
+        }
+      }
+
+      index += blankCount - 1;
+      continue;
+    }
+
+    normalized.push(line);
+  }
+
+  return normalized.join("\n");
+};
 
 const convertAllowedHtml = (input: string) => {
   const lineBreakMatch = input.match(LINE_BREAK_TAG_PATTERN);
@@ -49,6 +123,7 @@ const convertAllowedHtml = (input: string) => {
 };
 
 export const normalizeRenderableMarkdown = (value: string) => {
+  const normalizedValue = preserveBlankLineRuns(value);
   let result = "";
   let index = 0;
   let atLineStart = true;
@@ -57,14 +132,14 @@ export const normalizeRenderableMarkdown = (value: string) => {
   let pendingFenceClose = false;
   let inlineCodeTicks = 0;
 
-  while (index < value.length) {
-    const current = value[index];
+  while (index < normalizedValue.length) {
+    const current = normalizedValue[index];
 
     if (atLineStart) {
       let markerIndex = index;
-      while (value[markerIndex] === " " || value[markerIndex] === "\t") markerIndex += 1;
+      while (normalizedValue[markerIndex] === " " || normalizedValue[markerIndex] === "\t") markerIndex += 1;
 
-      const fenceMatch = value.slice(markerIndex).match(FENCE_TAG_PATTERN);
+      const fenceMatch = normalizedValue.slice(markerIndex).match(FENCE_TAG_PATTERN);
       if (fenceMatch) {
         const marker = fenceMatch[1][0] as "`" | "~";
         const length = fenceMatch[1].length;
@@ -79,9 +154,9 @@ export const normalizeRenderableMarkdown = (value: string) => {
 
     if (!fenceMarker && current === "`") {
       let tickCount = 1;
-      while (value[index + tickCount] === "`") tickCount += 1;
+      while (normalizedValue[index + tickCount] === "`") tickCount += 1;
 
-      result += value.slice(index, index + tickCount);
+      result += normalizedValue.slice(index, index + tickCount);
       if (inlineCodeTicks === 0) inlineCodeTicks = tickCount;
       else if (inlineCodeTicks === tickCount) inlineCodeTicks = 0;
 
@@ -91,7 +166,7 @@ export const normalizeRenderableMarkdown = (value: string) => {
     }
 
     if (!fenceMarker && inlineCodeTicks === 0 && current === "<") {
-      const converted = convertAllowedHtml(value.slice(index));
+      const converted = convertAllowedHtml(normalizedValue.slice(index));
       if (converted) {
         result += converted.output;
         index += converted.length;

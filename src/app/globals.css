@@ -246,3 +246,58 @@ input:-moz-autofill {
 .toast-slide-in {
   animation: toast-slide-in 180ms ease-out both;
 }
+
+.markdown-rich li {
+  position: relative;
+  display: block;
+  padding-left: 1.25rem;
+}
+
+.markdown-rich ul,
+.markdown-rich ol {
+  padding-left: 0;
+}
+
+.markdown-rich ul > li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  top: 0;
+  line-height: inherit;
+}
+
+.markdown-rich ol {
+  counter-reset: markdown-ordered-list;
+}
+
+.markdown-rich ol > li {
+  counter-increment: markdown-ordered-list;
+}
+
+.markdown-rich ol > li::before {
+  content: counter(markdown-ordered-list) ".";
+  position: absolute;
+  left: 0;
+  top: 0;
+  line-height: inherit;
+}
+
+.markdown-rich li > p {
+  display: contents !important;
+  margin: 0 !important;
+}
+
+.markdown-rich li > p + p {
+  display: block !important;
+  margin-top: 0.5rem !important;
+}
+
+.markdown-rich li > div[aria-hidden] {
+  display: block;
+  margin: 0.5rem 0;
+}
+
+.markdown-rich li > :is(ul, ol) {
+  display: block;
+  margin-top: 0.5rem;
+}

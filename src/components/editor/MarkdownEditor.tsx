@@ -12,6 +12,7 @@ import { showErrorToast } from "@/lib/toast/events";
 type Props = {
   value: string;
   onChange: (next: string) => void;
+  maxLength?: number;
 };
 
 const MAX_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -63,7 +64,7 @@ type EditorUpdate = {
   selectionEnd: number;
 };
 
-export default function MarkdownEditor({ value, onChange }: Props) {
+export default function MarkdownEditor({ value, onChange, maxLength }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<"edit" | "preview" | "split">("split");
@@ -309,6 +310,7 @@ export default function MarkdownEditor({ value, onChange }: Props) {
             className="min-h-[420px] w-full resize-none bg-transparent px-5 py-5 text-sm leading-7 text-(--foreground) outline-none placeholder:text-(--muted)"
             value={markdown}
             onChange={(event) => onChange(event.target.value)}
+            maxLength={maxLength}
             onPaste={onPaste}
             onDragOver={(event) => event.preventDefault()}
             onDrop={onDrop}
@@ -317,13 +319,19 @@ export default function MarkdownEditor({ value, onChange }: Props) {
         )}
 
         {(mode === "preview" || mode === "split") && (
-          <div className="min-h-[420px] w-full border-t border-(--border) px-5 py-5 md:border-l md:border-t-0">
+          <div className="markdown-rich min-h-[420px] w-full border-t border-(--border) px-5 py-5 md:border-l md:border-t-0">
             <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={safeUrlTransform} components={markdownComponents}>
               {normalizeRenderableMarkdown(previewMarkdown)}
             </ReactMarkdown>
           </div>
         )}
       </div>
+
+      {typeof maxLength === "number" ? (
+        <p className="text-right text-xs text-(--muted-strong)">
+          {markdown.length}/{maxLength}
+        </p>
+      ) : null}
     </div>
   );
 }
