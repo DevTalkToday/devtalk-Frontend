@@ -23,6 +23,7 @@ type AppShellProps = {
   description?: string;
   actions?: ReactNode;
   sidebar?: ReactNode;
+  footerSlot?: ReactNode;
   showPageHeader?: boolean;
   compactRadius?: boolean;
   children: ReactNode;
@@ -171,6 +172,7 @@ export function AppShell({
   description,
   actions,
   sidebar,
+  footerSlot,
   showPageHeader = true,
   compactRadius = true,
   children,
@@ -497,6 +499,7 @@ export function AppShell({
             개인정보 처리방침
           </Link>
         </footer>
+        {footerSlot ? <div className="flex justify-center empty:hidden">{footerSlot}</div> : null}
       </div>
     </div>
   );

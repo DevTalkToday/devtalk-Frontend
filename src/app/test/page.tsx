@@ -1,26 +1,35 @@
-import { AdminOnlyNotFound } from "@/components/auth/admin-only-not-found";
 import { AdsenseBanner } from "@/components/ads/adsense-banner";
+import { AdminOnlyNotFound } from "@/components/auth/admin-only-not-found";
 import { AppShell } from "@/components/devtalk/app-shell";
 
-const TEST_TITLE = "\uAD00\uB9AC\uC790 \uD14C\uC2A4\uD2B8";
-const TEST_DESCRIPTION = "\uAD00\uB9AC\uC790 \uACC4\uC815\uC73C\uB85C \uC811\uC18D\uD588\uC744 \uB54C\uB9CC \uBCFC \uC218 \uC788\uB294 \uD398\uC774\uC9C0\uC785\uB2C8\uB2E4.";
-const TEST_READY = "\uD14C\uC2A4\uD2B8 \uD398\uC774\uC9C0\uAC00 \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
-const TEST_AD_LABEL = "\uD14C\uC2A4\uD2B8 \uAD11\uACE0 \uBC30\uB108";
+const TEST_TITLE = "관리자 테스트";
+const TEST_DESCRIPTION = "관리자 계정으로 접속했을 때만 볼 수 있는 페이지입니다.";
+const TEST_READY = "테스트 페이지가 준비되었습니다.";
+const ADSENSE_CLIENT_FALLBACK = "ca-pub-6481460578393836";
+const ADSENSE_CLIENT =
+  process.env.NEXT_PUBLIC_ADSENSE_CLIENT &&
+  process.env.NEXT_PUBLIC_ADSENSE_CLIENT !== "ca-pub-your-publisher-id"
+    ? process.env.NEXT_PUBLIC_ADSENSE_CLIENT
+    : ADSENSE_CLIENT_FALLBACK;
 
 export default function TestPage() {
   return (
     <AdminOnlyNotFound>
-      <AppShell title={TEST_TITLE} description={TEST_DESCRIPTION}>
-        <div className="grid gap-4">
-          <section className="rounded-[28px] border border-(--border) bg-(--surface) p-6 text-sm font-semibold text-(--foreground) shadow-(--shadow)">
-            {TEST_READY}
-          </section>
+      <AppShell
+        title={TEST_TITLE}
+        description={TEST_DESCRIPTION}
+        footerSlot={
           <AdsenseBanner
-            client={process.env.NEXT_PUBLIC_ADSENSE_CLIENT}
+            client={ADSENSE_CLIENT}
             slot={process.env.NEXT_PUBLIC_ADSENSE_TEST_SLOT}
-            label={TEST_AD_LABEL}
+            label=""
+            className="max-w-[640px]"
           />
-        </div>
+        }
+      >
+        <section className="rounded-[28px] border border-(--border) bg-(--surface) p-6 text-sm font-semibold text-(--foreground) shadow-(--shadow)">
+          {TEST_READY}
+        </section>
       </AppShell>
     </AdminOnlyNotFound>
   );

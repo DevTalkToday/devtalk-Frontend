@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 declare global {
   interface Window {
@@ -13,15 +13,17 @@ type AdsenseBannerProps = {
   client?: string;
   slot?: string;
   label?: string;
+  className?: string;
 };
 
-const CONFIG_TITLE = "\uAD11\uACE0 \uC124\uC815\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.";
-const CONFIG_DESCRIPTION =
-  ".env.local\uC5D0 NEXT_PUBLIC_ADSENSE_CLIENT\uC640 NEXT_PUBLIC_ADSENSE_TEST_SLOT\uC744 \uCD94\uAC00\uD558\uBA74 \uC774 \uC790\uB9AC\uC5D0 AdSense \uBC30\uB108\uAC00 \uB85C\uB4DC\uB429\uB2C8\uB2E4.";
-const DEFAULT_LABEL = "\uAD11\uACE0";
+type AdStatus = "pending" | "filled" | "unfilled";
 
-export function AdsenseBanner({ client, slot, label = DEFAULT_LABEL }: AdsenseBannerProps) {
+const DEFAULT_LABEL = "광고";
+
+export function AdsenseBanner({ client, slot, label = DEFAULT_LABEL, className = "" }: AdsenseBannerProps) {
   const requestedRef = useRef(false);
+  const bannerRef = useRef<HTMLModElement | null>(null);
+  const [adStatus, setAdStatus] = useState<AdStatus>("pending");
   const isConfigured = Boolean(client && slot);
 
   const requestAd = useCallback(() => {
@@ -40,18 +42,35 @@ export function AdsenseBanner({ client, slot, label = DEFAULT_LABEL }: AdsenseBa
     requestAd();
   }, [requestAd]);
 
+  useEffect(() => {
+    requestedRef.current = false;
+
+    const bannerElement = bannerRef.current;
+    if (!bannerElement) return;
+
+    const syncAdStatus = () => {
+      const nextStatus = bannerElement.dataset.adStatus;
+      if (nextStatus === "filled" || nextStatus === "unfilled") {
+        setAdStatus(nextStatus);
+      }
+    };
+
+    syncAdStatus();
+
+    const observer = new MutationObserver(syncAdStatus);
+    observer.observe(bannerElement, { attributes: true, attributeFilter: ["data-ad-status"] });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [client, slot]);
+
   if (!isConfigured) {
-    return (
-      <section className="grid gap-2 rounded-[20px] border border-dashed border-(--border) bg-(--surface-raised) p-5 text-sm text-(--muted-strong)">
-        <h2 className="font-semibold text-(--foreground)">{CONFIG_TITLE}</h2>
-        <p className="leading-6">{CONFIG_DESCRIPTION}</p>
-      </section>
-    );
+    return null;
   }
 
   return (
-    <section className="grid gap-2 rounded-[20px] border border-(--border) bg-(--surface-raised) p-4 shadow-(--shadow)">
-      <p className="text-xs font-semibold text-(--muted-strong)">{label}</p>
+    <>
       <Script
         id="adsense-script"
         async
@@ -60,14 +79,27 @@ export function AdsenseBanner({ client, slot, label = DEFAULT_LABEL }: AdsenseBa
         strategy="afterInteractive"
         onLoad={requestAd}
       />
-      <ins
-        className="adsbygoogle"
-        style={{ display: "block", minHeight: 120 }}
-        data-ad-client={client}
-        data-ad-slot={slot}
-        data-ad-format="auto"
-        data-full-width-responsive="true"
-      />
-    </section>
+      <section
+        aria-hidden={adStatus !== "filled"}
+        className={[
+          "mx-auto w-full overflow-hidden transition-[max-height,opacity,padding,margin] duration-200",
+          adStatus === "filled"
+            ? "mt-6 max-h-[280px] rounded-[20px] border border-(--border) bg-(--surface-raised) p-4 shadow-(--shadow)"
+            : "max-h-0 border-0 p-0 opacity-0",
+          className,
+        ].join(" ")}
+      >
+        {label ? <p className="mb-2 text-xs font-semibold text-(--muted-strong)">{label}</p> : null}
+        <ins
+          ref={bannerRef}
+          className="adsbygoogle"
+          style={{ display: "block" }}
+          data-ad-client={client}
+          data-ad-slot={slot}
+          data-ad-format="auto"
+          data-full-width-responsive="true"
+        />
+      </section>
+    </>
   );
 }
