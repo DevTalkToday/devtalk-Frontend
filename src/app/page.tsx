@@ -1,49 +1,31 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
-import { Suspense, startTransition } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/devtalk/app-shell";
 import { PostCard } from "@/components/devtalk/post-card";
-import { Button, buttonClassName, chipButtonClassName } from "@/components/ui";
-import { FetchGet } from "@/lib/api/fetch";
+import { buttonClassName, chipButtonClassName } from "@/components/ui";
 import { formatRelativePostDate } from "@/lib/date/relative";
-import { startNavigationProgress } from "@/lib/navigation/progress";
+import { normalizePostListResponse } from "@/lib/posts/response";
 import { type PostSummary } from "@/lib/posts/types";
+import { getServerApiBaseUrl } from "@/lib/site/config";
 
-type PostsResponse = {
-  items: PostSummary[];
-  pageInfo: {
-    page: number;
-    limit: number;
-    totalCount: number;
-    totalPages: number;
-    hasNextPage: boolean;
-    hasPreviousPage: boolean;
-  };
+type HomePageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-const LATEST_POSTS_HEADING = "\uCD5C\uC2E0 \uAC8C\uC2DC\uAE00";
-const WRITE_LABEL = "\uAE00 \uC791\uC131";
-const POSTS_LOADING = "\uAC8C\uC2DC\uAE00\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4.";
-const POSTS_ERROR = "\uAC8C\uC2DC\uAE00 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.";
-const EMPTY_POSTS_TITLE = "\uAC8C\uC2DC\uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4";
-const EMPTY_POSTS_DESCRIPTION =
-  "\uAC80\uC0C9\uC5B4\uB97C \uBC14\uAFB8\uAC70\uB098 \uC0C8 \uAC8C\uC2DC\uAE00\uC744 \uC791\uC131\uD574 \uC8FC\uC138\uC694.";
-const PAGE_INFO_LABEL = (totalCount: number, page: number, totalPages: number) =>
-  `\uCD1D ${totalCount}\uAC1C \uC911 ${page} / ${totalPages} \uD398\uC774\uC9C0`;
-const PREVIOUS_LABEL = "\uC774\uC804";
-const NEXT_LABEL = "\uB2E4\uC74C";
-const HELP_WANTED_BADGE = "\uB3C4\uC6C0 \uD544\uC694";
-const HELP_WANTED_PANEL_TITLE = "\uB3C4\uC640\uC8FC\uC138\uC694!";
-const HELP_WANTED_PANEL_META = "\uCD5C\uC2E0 5\uAC1C";
-const HELP_WANTED_LOADING = "\uB3C4\uC6C0 \uD544\uC694 \uAC8C\uC2DC\uAE00\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4.";
-const HELP_WANTED_ERROR = "\uB3C4\uC6C0 \uD544\uC694 \uAC8C\uC2DC\uAE00\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.";
-const HELP_WANTED_EMPTY = "\uD45C\uC2DC\uD560 \uB3C4\uC6C0 \uD544\uC694 \uAC8C\uC2DC\uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.";
-const COMMENTS_LABEL = (count: number) => `\uB313\uAE00 ${count}`;
-const SUSPENSE_FALLBACK = "\uAC8C\uC2DC\uAE00\uC744 \uC900\uBE44\uD558\uB294 \uC911\uC785\uB2C8\uB2E4.";
+const LATEST_POSTS_HEADING = "최신 게시글";
+const WRITE_LABEL = "글 작성";
+const POSTS_ERROR = "게시글 목록을 불러오지 못했습니다.";
+const EMPTY_POSTS_TITLE = "게시글이 없습니다";
+const EMPTY_POSTS_DESCRIPTION = "검색어를 바꾸거나 새 게시글을 작성해 주세요.";
+const PAGE_INFO_LABEL = (totalCount: number, page: number, totalPages: number) => `총 ${totalCount}개 중 ${page} / ${totalPages} 페이지`;
+const PREVIOUS_LABEL = "이전";
+const NEXT_LABEL = "다음";
+const HELP_WANTED_BADGE = "도움 필요";
+const HELP_WANTED_PANEL_TITLE = "도와주세요!";
+const HELP_WANTED_PANEL_META = "최신 5개";
+const HELP_WANTED_ERROR = "도움 필요 게시글을 불러오지 못했습니다.";
+const HELP_WANTED_EMPTY = "표시할 도움 필요 게시글이 없습니다.";
+const COMMENTS_LABEL = (count: number) => `댓글 ${count}`;
 
 const buildPages = (current: number, total: number) => {
   const pages: Array<number | "ellipsis"> = [];
@@ -64,7 +46,49 @@ const buildPages = (current: number, total: number) => {
   return pages;
 };
 
-const fetchPosts = (path: string) => FetchGet(path) as Promise<PostsResponse>;
+const getSearchValue = (value: string | string[] | undefined) => {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
+};
+
+const buildPageHref = (page: number, query: string) => {
+  const params = new URLSearchParams();
+
+  if (query) params.set("q", query);
+  params.set("sort", "latest");
+  params.set("page", String(page));
+
+  return `/?${params.toString()}`;
+};
+
+const buildApiUrl = (path: string) => {
+  const baseUrl = getServerApiBaseUrl();
+  if (!baseUrl) return null;
+  return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+};
+
+const fetchPostList = async (path: string) => {
+  const url = buildApiUrl(path);
+  if (!url) return null;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) return null;
+
+    const contentType = response.headers.get("content-type") ?? "";
+    const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+
+    return normalizePostListResponse(payload);
+  } catch {
+    return null;
+  }
+};
 
 function HelpWantedPostItem({ post }: { post: PostSummary }) {
   return (
@@ -88,11 +112,11 @@ function HelpWantedPostItem({ post }: { post: PostSummary }) {
   );
 }
 
-function HomePageContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const query = searchParams.get("q") ?? "";
-  const page = Math.max(Number(searchParams.get("page") ?? 1) || 1, 1);
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const resolvedSearchParams = await searchParams;
+  const query = getSearchValue(resolvedSearchParams.q).trim();
+  const rawPage = Number(getSearchValue(resolvedSearchParams.page) || "1");
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
 
   const latestPath = `/posts?${new URLSearchParams({
     sort: "latest",
@@ -109,33 +133,12 @@ function HomePageContent() {
     limit: "5",
   }).toString()}`;
 
-  const latestQuery = useQuery({
-    queryKey: ["posts", "home-latest", query, page],
-    queryFn: () => fetchPosts(latestPath),
-    placeholderData: keepPreviousData,
-  });
+  const [latestResponse, helpWantedResponse] = await Promise.all([fetchPostList(latestPath), fetchPostList(helpWantedPath)]);
 
-  const helpWantedQuery = useQuery({
-    queryKey: ["posts", "home-help-wanted"],
-    queryFn: () => fetchPosts(helpWantedPath),
-  });
-
-  const latestItems = latestQuery.data?.items ?? [];
-  const helpWantedItems = helpWantedQuery.data?.items ?? [];
-  const pageInfo = latestQuery.data?.pageInfo;
+  const latestItems = latestResponse?.items ?? [];
+  const helpWantedItems = helpWantedResponse?.items ?? [];
+  const pageInfo = latestResponse?.pageInfo;
   const pages = pageInfo ? buildPages(pageInfo.page, pageInfo.totalPages) : [];
-
-  const applyPage = (nextPage: number) => {
-    const params = new URLSearchParams(searchParams.toString());
-
-    if (query) params.set("q", query);
-    else params.delete("q");
-
-    params.set("sort", "latest");
-    params.set("page", String(nextPage));
-    startNavigationProgress();
-    startTransition(() => router.push(`/?${params.toString()}`));
-  };
 
   return (
     <AppShell showPageHeader={false}>
@@ -151,65 +154,56 @@ function HomePageContent() {
             </Link>
           </div>
 
-          {latestQuery.isLoading ? (
-            <div className="rounded-[28px] border border-(--border) bg-(--surface) p-6 text-sm text-(--muted-strong) shadow-(--shadow)">
-              {POSTS_LOADING}
-            </div>
-          ) : null}
-
-          {latestQuery.isError ? (
+          {!latestResponse ? (
             <div className="rounded-[28px] border border-(--border) bg-(--surface) p-6 text-sm text-(--danger) shadow-(--shadow)">
               {POSTS_ERROR}
             </div>
           ) : null}
 
-          {!latestQuery.isLoading && !latestQuery.isError && latestItems.length === 0 ? (
+          {latestResponse && latestItems.length === 0 ? (
             <div className="rounded-[28px] border border-(--border) bg-(--surface) p-6 shadow-(--shadow)">
               <h2 className="text-lg font-semibold">{EMPTY_POSTS_TITLE}</h2>
               <p className="mt-2 text-sm leading-6 text-(--muted-strong)">{EMPTY_POSTS_DESCRIPTION}</p>
             </div>
           ) : null}
 
-          {!latestQuery.isLoading && !latestQuery.isError
-            ? latestItems.map((item) => <PostCard key={item.id} post={item} />)
-            : null}
+          {latestItems.map((item) => (
+            <PostCard key={item.id} post={item} />
+          ))}
 
           {pageInfo ? (
             <div className="flex flex-col gap-4 rounded-[28px] border border-(--border) bg-(--surface) p-5 shadow-(--shadow) md:flex-row md:items-center md:justify-between">
-              <p className="text-sm text-(--muted-strong)">
-                {PAGE_INFO_LABEL(pageInfo.totalCount, pageInfo.page, pageInfo.totalPages)}
-              </p>
+              <p className="text-sm text-(--muted-strong)">{PAGE_INFO_LABEL(pageInfo.totalCount, pageInfo.page, pageInfo.totalPages)}</p>
               <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  disabled={!pageInfo.hasPreviousPage}
-                  onClick={() => applyPage(pageInfo.page - 1)}
-                >
-                  {PREVIOUS_LABEL}
-                </Button>
+                {pageInfo.hasPreviousPage ? (
+                  <Link href={buildPageHref(pageInfo.page - 1, query)} className={buttonClassName()}>
+                    {PREVIOUS_LABEL}
+                  </Link>
+                ) : (
+                  <span aria-disabled="true" className={buttonClassName({ className: "pointer-events-none" })}>
+                    {PREVIOUS_LABEL}
+                  </span>
+                )}
                 {pages.map((item, index) =>
                   item === "ellipsis" ? (
                     <span key={`${item}-${index}`} className="px-2 text-sm text-(--muted)">
                       ...
                     </span>
                   ) : (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => applyPage(item)}
-                      className={chipButtonClassName({ selected: item === pageInfo.page })}
-                    >
+                    <Link key={item} href={buildPageHref(item, query)} className={chipButtonClassName({ selected: item === pageInfo.page })}>
                       {item}
-                    </button>
+                    </Link>
                   )
                 )}
-                <Button
-                  type="button"
-                  disabled={!pageInfo.hasNextPage}
-                  onClick={() => applyPage(pageInfo.page + 1)}
-                >
-                  {NEXT_LABEL}
-                </Button>
+                {pageInfo.hasNextPage ? (
+                  <Link href={buildPageHref(pageInfo.page + 1, query)} className={buttonClassName()}>
+                    {NEXT_LABEL}
+                  </Link>
+                ) : (
+                  <span aria-disabled="true" className={buttonClassName({ className: "pointer-events-none" })}>
+                    {NEXT_LABEL}
+                  </span>
+                )}
               </div>
             </div>
           ) : null}
@@ -223,30 +217,17 @@ function HomePageContent() {
             </div>
 
             <div className="grid gap-3">
-              {helpWantedQuery.isLoading ? (
-                <p className="text-sm text-(--muted-strong)">{HELP_WANTED_LOADING}</p>
-              ) : null}
-              {helpWantedQuery.isError ? (
-                <p className="text-sm text-(--danger)">{HELP_WANTED_ERROR}</p>
-              ) : null}
-              {!helpWantedQuery.isLoading && !helpWantedQuery.isError && helpWantedItems.length === 0 ? (
+              {!helpWantedResponse ? <p className="text-sm text-(--danger)">{HELP_WANTED_ERROR}</p> : null}
+              {helpWantedResponse && helpWantedItems.length === 0 ? (
                 <p className="text-sm text-(--muted-strong)">{HELP_WANTED_EMPTY}</p>
               ) : null}
-              {!helpWantedQuery.isLoading && !helpWantedQuery.isError
-                ? helpWantedItems.map((item) => <HelpWantedPostItem key={item.id} post={item} />)
-                : null}
+              {helpWantedItems.map((item) => (
+                <HelpWantedPostItem key={item.id} post={item} />
+              ))}
             </div>
           </div>
         </aside>
       </div>
     </AppShell>
-  );
-}
-
-export default function HomePage() {
-  return (
-    <Suspense fallback={<div className="p-6 text-sm text-(--muted-strong)">{SUSPENSE_FALLBACK}</div>}>
-      <HomePageContent />
-    </Suspense>
   );
 }

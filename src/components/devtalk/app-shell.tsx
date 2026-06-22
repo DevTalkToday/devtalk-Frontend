@@ -5,8 +5,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import { AdsenseBanner } from "@/components/ads/adsense-banner";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { buttonClassName } from "@/components/ui";
+import { getAdsenseClient, getAdsenseSlot } from "@/lib/adsense/config";
 import { FetchGetAuthSilent, FetchPostAuthSilent } from "@/lib/api/fetch";
 import {
   beginLogoutRedirect,
@@ -104,6 +106,9 @@ const emptyNavIndicatorState: NavIndicatorState = {
   messages: false,
   notifications: false,
 };
+
+const globalAdsenseClient = getAdsenseClient();
+const globalAdsenseSlot = getAdsenseSlot();
 
 const isActivePath = (pathname: string, href: string) => {
   if (href === "/") return pathname === "/";
@@ -499,6 +504,9 @@ export function AppShell({
             개인정보 처리방침
           </Link>
         </footer>
+        <div className="flex justify-center empty:hidden">
+          <AdsenseBanner client={globalAdsenseClient} slot={globalAdsenseSlot} label="" className="max-w-[640px]" />
+        </div>
         {footerSlot ? <div className="flex justify-center empty:hidden">{footerSlot}</div> : null}
       </div>
     </div>

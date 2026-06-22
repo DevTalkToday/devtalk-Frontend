@@ -1,10 +1,27 @@
 import type { Metadata } from "next";
+import { getGoogleSiteVerification, getSiteUrl } from "@/lib/site/config";
 import { Providers } from "./providers";
 import "./globals.css";
+
+const siteUrl = getSiteUrl();
+const googleSiteVerification = getGoogleSiteVerification();
 
 export const metadata: Metadata = {
   title: "Devtalk",
   description: "Developer communication platform",
+  metadataBase: new URL(siteUrl),
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  verification: googleSiteVerification
+    ? {
+        google: googleSiteVerification,
+      }
+    : undefined,
   icons: {
     icon: "/DevTalk.svg",
     shortcut: "/DevTalk.svg",
