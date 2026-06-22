@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { getAdsenseAccountMeta } from "@/lib/adsense/config";
 import { getGoogleSiteVerification, getSiteUrl } from "@/lib/site/config";
 import { Providers } from "./providers";
 import "./globals.css";
 
+const adsenseAccount = getAdsenseAccountMeta();
 const siteUrl = getSiteUrl();
 const googleSiteVerification = getGoogleSiteVerification();
 
@@ -22,6 +24,9 @@ export const metadata: Metadata = {
         google: googleSiteVerification,
       }
     : undefined,
+  other: {
+    "google-adsense-account": adsenseAccount,
+  },
   icons: {
     icon: "/DevTalk.svg",
     shortcut: "/DevTalk.svg",
