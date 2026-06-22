@@ -1,4 +1,4 @@
-export const POST_CATEGORIES = ["qna", "bug", "discussion", "talk"] as const;
+export const POST_CATEGORIES = ["qna", "bug", "discussion", "info", "talk"] as const;
 export const POST_SORT_OPTIONS = ["latest", "oldest", "popular", "views", "comments"] as const;
 export const POST_RESOLUTION_FILTERS = ["all", "resolved", "unresolved"] as const;
 export const BUG_STATUSES = ["open", "investigating", "fixed", "closed"] as const;
@@ -122,6 +122,7 @@ export const CATEGORY_LABELS: Record<PostCategory, string> = {
   qna: "해결 기록",
   bug: "도움 필요",
   discussion: "토론",
+  info: "정보 공유",
   talk: "나만 보기",
 };
 

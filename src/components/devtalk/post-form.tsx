@@ -372,6 +372,7 @@ export function PostForm({ mode, postId, initialPost }: Props) {
                 { value: "qna", label: CATEGORY_LABELS.qna },
                 { value: "bug", label: CATEGORY_LABELS.bug },
                 { value: "discussion", label: CATEGORY_LABELS.discussion },
+                { value: "info", label: CATEGORY_LABELS.info },
                 { value: "talk", label: CATEGORY_LABELS.talk },
               ]}
             />
